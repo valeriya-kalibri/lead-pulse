@@ -16,7 +16,7 @@ export default function ListActions({ listId, listName, userId, prospectIds, isP
   const router = useRouter()
   const [deleting, setDeleting] = useState(false)
   const [syncing, setSyncing] = useState(false)
-  const [syncResult, setSyncResult] = useState<{ synced: number; failed: number } | null>(null)
+  const [syncResult, setSyncResult] = useState<{ synced: number; failed: number; errors: Array<{ prospectId: string; error: string }> } | null>(null)
 
   async function handleDelete() {
     if (!confirm(`Delete "${listName}"? This will permanently remove all prospects and results. This cannot be undone.`)) return
@@ -49,7 +49,7 @@ export default function ListActions({ listId, listName, userId, prospectIds, isP
         alert(json.error ?? 'HubSpot sync failed.')
         return
       }
-      setSyncResult({ synced: json.synced, failed: json.failed })
+      setSyncResult({ synced: json.synced, failed: json.failed, errors: json.errors ?? [] })
     } finally {
       setSyncing(false)
     }
@@ -59,19 +59,28 @@ export default function ListActions({ listId, listName, userId, prospectIds, isP
   const syncDisabledReason = !isPro
     ? 'Pro plan required'
     : !hasHubspotKey
-    ? 'Add HubSpot API key in Settings'
+    ? 'Connect HubSpot in Settings'
     : null
 
   return (
     <div className="flex items-center gap-2">
       {/* HubSpot sync */}
       {syncResult ? (
-        <div className="inline-flex items-center gap-1.5 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm font-medium text-green-700">
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-          </svg>
-          {syncResult.synced} synced{syncResult.failed > 0 ? `, ${syncResult.failed} failed` : ''}
-          <button onClick={() => setSyncResult(null)} className="ml-1 opacity-50 hover:opacity-100 text-xs">✕</button>
+        <div className="flex flex-col gap-1">
+          <div className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium ${syncResult.failed > 0 && syncResult.synced === 0 ? 'border-red-200 bg-red-50 text-red-700' : 'border-green-200 bg-green-50 text-green-700'}`}>
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d={syncResult.failed > 0 && syncResult.synced === 0 ? 'M6 18L18 6M6 6l12 12' : 'M5 13l4 4L19 7'} />
+            </svg>
+            {syncResult.synced} synced{syncResult.failed > 0 ? `, ${syncResult.failed} failed` : ''}
+            <button onClick={() => setSyncResult(null)} className="ml-1 opacity-50 hover:opacity-100 text-xs">✕</button>
+          </div>
+          {(syncResult.errors?.length ?? 0) > 0 && (
+            <div className="rounded-lg border border-red-100 bg-red-50 px-3 py-2 text-xs text-red-700 space-y-0.5 max-w-sm">
+              {syncResult.errors.map((e) => (
+                <p key={e.prospectId} className="truncate" title={e.error}><span className="font-medium">Error:</span> {e.error}</p>
+              ))}
+            </div>
+          )}
         </div>
       ) : (
         <div className="relative group">

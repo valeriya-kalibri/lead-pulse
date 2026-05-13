@@ -369,7 +369,7 @@ export default function ProspectTable({
                 href="/settings"
                 className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-500 hover:border-[#2E3A59] hover:text-[#2E3A59] transition-colors whitespace-nowrap"
               >
-                Add HubSpot API Key
+                Connect HubSpot
               </a>
             )
           )}

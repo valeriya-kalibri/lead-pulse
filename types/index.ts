@@ -1,4 +1,5 @@
 export type Plan = 'starter' | 'pro'
+export type Role = 'admin' | 'user'
 export type YesNoUnknown = 'yes' | 'no' | 'unknown'
 export type ErrorType =
   | 'TIMEOUT'
@@ -36,7 +37,10 @@ export interface Profile {
   full_name: string | null
   company_name: string | null
   plan: Plan
-  hubspot_api_key: string | null
+  role: Role
+  hubspot_access_token: string | null
+  hubspot_refresh_token: string | null
+  hubspot_token_expires_at: string | null
   hubspot_portal_id: string | null
   created_at: string
   updated_at: string
@@ -104,7 +108,6 @@ export interface Prospect {
   intel_generated_at: string | null
   hubspot_contact_id: string | null
   hubspot_company_id: string | null
-  hubspot_note_id: string | null
   hubspot_synced_at: string | null
   created_at: string
   updated_at: string

@@ -1,15 +1,28 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { Profile } from '@/types'
 
 export default function SettingsForm({ profile }: { profile: Profile }) {
   const [fullName, setFullName] = useState(profile.full_name ?? '')
   const [companyName, setCompanyName] = useState(profile.company_name ?? '')
-  const [hubspotKey, setHubspotKey] = useState(profile.hubspot_api_key ?? '')
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
+  const [messageIsError, setMessageIsError] = useState(false)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('hs_connected') === '1') {
+      setMessage('HubSpot connected successfully.')
+      setMessageIsError(false)
+    } else if (params.get('hs_error') === 'denied') {
+      setMessage('HubSpot connection was cancelled.')
+      setMessageIsError(true)
+    } else if (params.get('hs_error')) {
+      setMessage('Failed to connect HubSpot. Please try again.')
+      setMessageIsError(true)
+    }
+  }, [])
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault()
@@ -22,7 +35,6 @@ export default function SettingsForm({ profile }: { profile: Profile }) {
       .update({
         full_name: fullName,
         company_name: companyName,
-        hubspot_api_key: profile.plan === 'pro' ? hubspotKey || null : profile.hubspot_api_key,
       })
       .eq('id', profile.id)
 
@@ -84,20 +96,38 @@ export default function SettingsForm({ profile }: { profile: Profile }) {
         </div>
 
         <div>
-          <label className="block text-xs font-medium text-gray-500 mb-1">HubSpot API key</label>
-          <input
-            type="password"
-            value={hubspotKey}
-            onChange={(e) => setHubspotKey(e.target.value)}
-            disabled={profile.plan !== 'pro'}
-            placeholder={profile.plan !== 'pro' ? 'Upgrade to Pro to use HubSpot sync' : 'pat-na1-xxxxxxxx'}
-            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-[#2E3A59] focus:outline-none focus:ring-2 focus:ring-[#AABFFF] disabled:bg-gray-50 disabled:text-gray-400 disabled:cursor-not-allowed"
-          />
+          {profile.plan === 'pro' ? (
+            profile.hubspot_access_token ? (
+              <div className="flex items-center justify-between">
+                <span className="flex items-center gap-2 text-sm text-green-700">
+                  <span className="inline-block w-2 h-2 rounded-full bg-green-500" />
+                  HubSpot connected
+                </span>
+                <a
+                  href="/api/hubspot/auth"
+                  className="text-xs text-gray-400 hover:text-[#2E3A59] underline transition-colors"
+                >
+                  Reconnect
+                </a>
+              </div>
+            ) : (
+              <a
+                href="/api/hubspot/auth"
+                className="flex w-full items-center justify-center rounded-lg border border-[#ff7a59] bg-white px-4 py-2.5 text-sm font-medium text-[#ff7a59] hover:bg-[#fff5f3] transition-colors"
+              >
+                Connect HubSpot
+              </a>
+            )
+          ) : (
+            <p className="text-xs text-gray-400">Upgrade to Pro to connect HubSpot.</p>
+          )}
         </div>
       </div>
 
       {message && (
-        <p className="text-sm text-green-700 bg-green-50 rounded-lg px-3 py-2">{message}</p>
+        <p className={`text-sm rounded-lg px-3 py-2 ${messageIsError ? 'text-red-700 bg-red-50' : 'text-green-700 bg-green-50'}`}>
+          {message}
+        </p>
       )}
 
       <button

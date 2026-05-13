@@ -37,7 +37,7 @@ export default async function ListPage({ params }: Props) {
         .maybeSingle(),
       supabase
         .from('profiles')
-        .select('plan, hubspot_api_key, hubspot_portal_id')
+        .select('plan, hubspot_access_token, hubspot_portal_id')
         .eq('id', user.id)
         .single(),
     ])
@@ -49,7 +49,7 @@ export default async function ListPage({ params }: Props) {
   const sj = job as ScrapeJob | null
   const criteria = pl.selected_criteria ?? ALL_CRITERIA
   const isPro = profile?.plan === 'pro'
-  const hasHubspotKey = Boolean(profile?.hubspot_api_key)
+  const hasHubspotKey = Boolean(profile?.hubspot_access_token)
   const hubspotPortalId = (profile?.hubspot_portal_id as string | null) ?? null
 
   return (

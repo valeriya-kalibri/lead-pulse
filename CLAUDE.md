@@ -60,7 +60,9 @@ Extended user data. Auto-created on Supabase Auth signup via trigger.
 | full_name | text | |
 | company_name | text | |
 | plan | text | 'starter' or 'pro' — default 'starter' |
-| hubspot_api_key | text | Pro plan only — user-provided HubSpot private app key |
+| hubspot_access_token | text | Pro plan only — HubSpot OAuth access token, obtained via OAuth flow |
+| hubspot_refresh_token | text | Pro plan only — HubSpot OAuth refresh token, used to renew access token |
+| hubspot_token_expires_at | timestamptz | Pro plan only — expiry time of current access token |
 | created_at | timestamptz | auto-managed |
 | updated_at | timestamptz | auto-managed |
 
@@ -133,7 +135,6 @@ Seeded on deploy. Read-only at runtime.
 | error_type | text | 'TIMEOUT' / 'BLOCKED' / 'DNS_FAILED' / 'PARSE_ERROR' / 'SSL_ERROR' / 'EMPTY_PAGE' / 'UNKNOWN' |
 | hubspot_contact_id | text | HubSpot contact record ID after sync |
 | hubspot_company_id | text | HubSpot company record ID after sync |
-| hubspot_note_id | text | HubSpot engagement/note ID after sync |
 | hubspot_synced_at | timestamptz | |
 | created_at | timestamptz | auto-managed |
 | updated_at | timestamptz | auto-managed |
@@ -469,7 +470,18 @@ URLs are deduplicated before scraping begins.
 
 ## HubSpot Integration
 
-HubSpot sync is a **Pro plan feature**. User provides their own HubSpot private app API key in Settings — stored in `profiles.hubspot_api_key`. All API calls use `Authorization: Bearer {apiKey}`.
+HubSpot sync is a **Pro plan feature**. LeadPulse connects to HubSpot via a **Public App OAuth flow** — users click "Connect HubSpot" in Settings, authorize via HubSpot's OAuth consent screen, and LeadPulse stores the resulting tokens in their profile.
+
+**Environment variables (server-side only — never expose to client):**
+- `HUBSPOT_CLIENT_ID` — from the HubSpot Public App settings
+- `HUBSPOT_CLIENT_SECRET` — from the HubSpot Public App settings
+
+**OAuth token storage per user (in `profiles` table):**
+- `hubspot_access_token` — current Bearer token used in all API calls
+- `hubspot_refresh_token` — used to renew the access token when it expires
+- `hubspot_token_expires_at` — expiry timestamp; refresh before making API calls if past this value
+
+All HubSpot API calls use `Authorization: Bearer {hubspot_access_token}`. Always check expiry and refresh the token before any sync operation.
 
 ### Sync Flow Per Prospect (in order)
 
@@ -483,27 +495,36 @@ Search HubSpot by `email` first, then `phone` if no email. Update if found, crea
 Associate Contact to Company using HubSpot Associations API v4:
 `PUT /crm/v4/objects/contacts/{contactId}/associations/default/companies/{companyId}`
 
-**Step D — Intel Note**
-If `prospects.intel` is not null, create a HubSpot Note (Engagement) on the Contact record. Associate note to both Contact and Company. Save ID to `prospects.hubspot_note_id`.
+**Step D — LeadPulse Intel Property**
+If `prospects.intel` is not null, format the Intel Card as structured text and write it to the `leadpulse_intel` custom property on both the Contact and Company records.
 
 **Step E — Update Supabase**
-Save `hubspot_contact_id`, `hubspot_company_id`, `hubspot_note_id`, `hubspot_synced_at` back to `prospects` table.
+Save `hubspot_contact_id`, `hubspot_company_id`, and `hubspot_synced_at` back to `prospects` table.
 
 **Rate limit:** 200ms delay between each prospect. HubSpot free plans allow 100 requests per 10 seconds. Sync accepts array of prospect IDs, processes sequentially.
 
-### HubSpot Contact Properties
+### HubSpot Contact & Company Properties
 
-**LeadPulse custom properties — auto-created on first sync run via Properties API v3:**
+Contact and company records receive **identical** LeadPulse custom properties. Both are auto-created by `ensureCustomProperties()` in `lib/hubspot.ts` at the start of each sync run (idempotent — checks before creating).
 
-| Label | Internal Name | Type | Group |
-|---|---|---|---|
-| Outreach Hook | outreach_hook | Single line text | LeadPulse |
-| LeadPulse Score | leadpulse_score | Single line text | LeadPulse |
-| LeadPulse List Name | leadpulse_list_name | Single line text | LeadPulse |
+**LeadPulse custom properties (same on both Contact and Company):**
 
-> `outreach_hook` does NOT have "LeadPulse" in its display name but it IS a custom LeadPulse property and must be created in the LeadPulse group. Do not skip it.
+| Label | Internal Name | Type | Contact Group | Company Group |
+|---|---|---|---|---|
+| Outreach Hook | outreach_hook | Single line text | contactinformation | companyinformation |
+| LeadPulse Score | leadpulse_score | Single line text | contactinformation | companyinformation |
+| LeadPulse List Name | leadpulse_list_name | Single line text | contactinformation | companyinformation |
+| LeadPulse Filter Summary | leadpulse_filter_summary | Multi-line text | contactinformation | companyinformation |
+| Practice Platform | practice_platform | Single line text | contactinformation | companyinformation |
+| CRM Platform | crm_platform | Single line text | contactinformation | companyinformation |
+| Has Chatbot | has_chatbot | Dropdown: Unknown / Yes / No | contactinformation | companyinformation |
+| Has Contact Form | has_contact_form | Dropdown: Unknown / Yes / No | contactinformation | companyinformation |
+| Has Online Booking | has_online_booking | Dropdown: Unknown / Yes / No | contactinformation | companyinformation |
+| Services Detected | services_detected | Single line text | contactinformation | companyinformation |
+| Location Count | location_count | Number | contactinformation | companyinformation |
+| LeadPulse Intel | leadpulse_intel | Multi-line text | contactinformation | companyinformation |
 
-**Default HubSpot contact properties — already exist, just populate, never create:**
+**Default HubSpot Contact properties — already exist, just populate, never create:**
 
 | Label | Internal Name | Notes |
 |---|---|---|
@@ -514,29 +535,7 @@ Save `hubspot_contact_id`, `hubspot_company_id`, `hubspot_note_id`, `hubspot_syn
 | Number of Employees | numemployees | |
 | Annual Revenue | annualrevenue | |
 
-**Pre-existing HubSpot properties — already in every HubSpot account, DO NOT create, DO NOT overwrite:**
-LinkedIn URL, First Conversion, Last Contacted, Number of times contacted, Recent Deal Amount, Buying Role, Lead Source, Intent Signals active, Has been enriched. LeadPulse never touches these fields.
-
----
-
-### HubSpot Company Properties
-
-**LeadPulse custom properties — auto-created on first sync run via Properties API v3:**
-
-| Label | Internal Name | Type | Group |
-|---|---|---|---|
-| Practice Platform | practice_platform | Single line text | LeadPulse |
-| CRM Platform | crm_platform | Single line text | LeadPulse |
-| Has Chatbot | has_chatbot | Dropdown: Yes / No / Unknown | LeadPulse |
-| Has Contact Form | has_contact_form | Dropdown: Yes / No / Unknown | LeadPulse |
-| Has Online Booking | has_online_booking | Dropdown: Yes / No / Unknown | LeadPulse |
-| Services Detected | services_detected | Single line text (comma-separated) | LeadPulse |
-| Location Count | location_count | Number (unformatted) | LeadPulse |
-| LeadPulse Score | leadpulse_score | Single line text | LeadPulse |
-| LeadPulse List Name | leadpulse_list_name | Single line text | LeadPulse |
-| LeadPulse Filter Summary | leadpulse_filter_summary | Multi line text | LeadPulse |
-
-**Default HubSpot company properties — already exist, just populate, never create:**
+**Default HubSpot Company properties — already exist, just populate, never create:**
 
 | Label | Internal Name | Notes |
 |---|---|---|
@@ -544,13 +543,11 @@ LinkedIn URL, First Conversion, Last Contacted, Number of times contacted, Recen
 | Website URL | website | Used for domain matching / deduplication |
 | City | city | |
 | State | state | |
-| Number of Employees | numemployees | |
+| Number of Employees | numberofemployees | |
 | Annual Revenue | annualrevenue | |
 
-**Pre-existing HubSpot properties — already in every HubSpot account, DO NOT create, DO NOT overwrite:**
-Lead Source, Intent Signals active, Has been enriched. LeadPulse never touches these fields.
-
-> All LeadPulse custom properties live in a property group called **LeadPulse**. The setup route (`/api/hubspot/setup-properties`) auto-creates all custom properties listed above on first run before any sync begins. It checks if each property already exists before creating — never duplicates.
+**Pre-existing HubSpot properties — DO NOT create, DO NOT overwrite:**
+LinkedIn URL, Lead Source, Last Contacted, Intent Signals active, Has been enriched. LeadPulse never touches these fields.
 
 ### HubSpot Value Mapping
 
@@ -568,7 +565,10 @@ Score: [prospect score]
 Scraped: [scraped_at date — Month DD YYYY]
 ```
 
-### HubSpot Intel Note Format
+### LeadPulse Intel Property Format
+
+When `prospects.intel` is not null, the Intel Card is formatted as structured text and written to the `leadpulse_intel` property on **both** the Contact and Company records. No HubSpot Note/Engagement is created.
+
 ```
 LeadPulse Intel — Generated [intel_generated_at]
 
@@ -604,7 +604,7 @@ PAIN INDICATORS: [pain_indicators]
 | AI Intel Cards | Pay per use | 100 included/month |
 | Error tracking & debug panel | ✅ | ✅ |
 | HubSpot Contact + Company sync | ❌ | ✅ |
-| Intel Card as HubSpot Note | ❌ | ✅ |
+| LeadPulse Intel property sync | ❌ | ✅ |
 | LeadPulse Filter Summary in HubSpot | ❌ | ✅ |
 | Multi-filter scoring dashboard | ❌ | ✅ |
 | Priority scraping | ❌ | ✅ |
