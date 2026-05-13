@@ -5,7 +5,7 @@ import { useState } from 'react'
 const STEPS = [
   {
     n: '01',
-    title: 'Export your list from Apollo',
+    title: 'Export your list from Apollo or HubSpot',
     body: 'Export your prospects as a CSV file. Make sure the website URL column is included. If multiple contacts share the same website, LeadPulse will scrape it once and apply the results to all of them.',
   },
   {
@@ -82,6 +82,19 @@ export default function HowItWorks() {
               </li>
             ))}
           </ol>
+
+          <div className="mt-4 border-t border-gray-100 pt-3 space-y-2">
+            <p className="text-xs font-medium text-[#2E3A59]">Exporting from HubSpot</p>
+            <p className="text-xs text-gray-500 leading-relaxed">
+              When exporting companies from HubSpot, use the <span className="font-medium text-[#2E3A59]">Export view</span> option and select <span className="font-medium text-[#2E3A59]">CSV</span> as your file format. Under <span className="font-medium text-[#2E3A59]">Properties included in export</span>, choose &ldquo;Properties and associations in your view&rdquo; — this keeps your file clean and only includes the columns you&rsquo;ve set up in your HubSpot view.
+            </p>
+            <p className="text-xs text-gray-500 leading-relaxed">
+              Make sure your view includes: <span className="font-medium text-[#2E3A59]">Company Name, Website Domain, Associated Contact (first name, last name, email, phone), City, State, Number of Employees,</span> and <span className="font-medium text-[#2E3A59]">Annual Revenue</span> before exporting. Under <span className="font-medium text-[#2E3A59]">Associations</span>, check &ldquo;Include associated record name&rdquo; and select &ldquo;Include up to 1,000 associated records per column.&rdquo;
+            </p>
+            <p className="text-xs text-gray-500 leading-relaxed">
+              Do not select &ldquo;All properties on records&rdquo; as this generates unnecessary columns that may slow down import. Once exported, your file is ready to upload directly into LeadPulse — no cleanup needed.
+            </p>
+          </div>
 
           <p className="mt-4 text-xs text-gray-400 border-t border-gray-100 pt-3 leading-relaxed">
             LeadPulse does not replace Apollo — it works alongside it. Apollo finds your

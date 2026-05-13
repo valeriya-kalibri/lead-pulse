@@ -45,11 +45,13 @@ export function parseCSV(content: string): ParsedRow[] {
 
   for (const row of data) {
     // ----- URL (required) -----
+    // Priority: HubSpot "Company Domain Name" → "Website URL" → other common patterns → any https:// value
     const urlValue =
       pick(
         row,
+        'companydomainname',   // HubSpot "Company Domain Name"
+        'websiteurl',          // HubSpot "Website URL" / Apollo "Company Website URL"
         'website',
-        'websiteurl',
         'companywebsite',
         'companywebsiteurl',
         'url',
@@ -81,18 +83,23 @@ export function parseCSV(content: string): ParsedRow[] {
 
     // ----- Employee count -----
     // Apollo: "# Employees" → norm "employees"
-    // Also handles: "Employee Count", "Number of Employees", "Headcount"
-    const employee_count = pick(
+    // HubSpot: "Number of Employees" → "numberofemployees", "Employee range" → "employeerange"
+    const rawEmployeeCount = pick(
       row,
       'employees',
       'employeecount',
       'numberofemployees',
       'numemployees',
+      'employeerange',     // HubSpot "Employee range"
       'headcount',
       'companysize',
       'teamsize',
       'staffcount',
     )
+    // HubSpot exports employee count as float strings ("150.0") — strip the decimal
+    const employee_count = rawEmployeeCount
+      ? rawEmployeeCount.replace(/\.0+$/, '')
+      : undefined
 
     // ----- Revenue -----
     // Apollo: "Annual Revenue" → norm "annualrevenue"
@@ -108,11 +115,11 @@ export function parseCSV(content: string): ParsedRow[] {
 
     // ----- Contact name -----
     // Prefer an explicit full-name column; fall back to combining first + last.
-    const explicitFullName = pick(row, 'fullname', 'contactname', 'contactfullname', 'personname')
+    let contact_name = pick(row, 'fullname', 'contactname', 'contactfullname', 'personname')
     const firstName = pick(row, 'firstname', 'contactfirstname', 'fname') ?? ''
     const lastName = pick(row, 'lastname', 'contactlastname', 'lname', 'surname') ?? ''
     const combined = [firstName, lastName].filter(Boolean).join(' ')
-    const contact_name = explicitFullName || combined || undefined
+    if (!contact_name) contact_name = combined || undefined
 
     // ----- Phone -----
     // Apollo exports: "Work Direct Phone", "Corporate Phone", "Direct Phone"
@@ -132,7 +139,7 @@ export function parseCSV(content: string): ParsedRow[] {
     )
 
     // ----- Email -----
-    const email = pick(
+    let email = pick(
       row,
       'email',
       'emailaddress',
@@ -143,9 +150,27 @@ export function parseCSV(content: string): ParsedRow[] {
       'corporateemail',
     )
 
+    // ----- HubSpot "Associated Contact" fallback -----
+    // Format: "First Last (email@domain.com);Second Person (other@domain.com)"
+    // Extract name + email from the first contact when standard columns are absent.
+    if (!contact_name || !email) {
+      const raw = row['associatedcontact']?.trim()
+      if (raw) {
+        const first = raw.split(';')[0].trim()
+        const m = first.match(/^(.+?)\s*\(([^)@\s]+@[^)]+)\)\s*$/)
+        if (m) {
+          if (!contact_name) contact_name = m[1].trim()
+          if (!email) email = m[2].trim()
+        } else if (!contact_name && first) {
+          contact_name = first
+        }
+      }
+    }
+
     // ----- City / State -----
     const city = pick(row, 'city', 'companycity', 'town')
-    const state = pick(row, 'state', 'companystate', 'province', 'stateprovince', 'region')
+    // HubSpot "State/Region" → "stateregion"
+    const state = pick(row, 'state', 'stateregion', 'companystate', 'province', 'stateprovince')
 
     rows.push({
       url,
@@ -180,6 +205,13 @@ export function prospectsToCSV(prospects: Prospect[], criteria: string[] = ALL_C
     base.contact_name = p.contact_name ?? ''
     base.email = p.email ?? ''
     base.phone = p.phone ?? ''
+
+    // Intel fields — always included; blank when intel hasn't been generated
+    base.intel_business_summary = p.intel?.business_summary ?? ''
+    base.intel_owner_profile = p.intel?.owner_profile ?? ''
+    base.intel_pain_indicators = p.intel?.pain_indicators ?? ''
+    base.intel_social_signals = p.intel?.social_signals ?? ''
+    base.intel_conversation_starters = (p.intel?.conversation_starters ?? []).join(' | ')
 
     // Criteria-gated scraped fields
     if (criteria.includes('chatbot')) {

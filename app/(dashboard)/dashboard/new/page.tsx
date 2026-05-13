@@ -12,6 +12,10 @@ const FALLBACK_TEMPLATES: Omit<IndustryTemplate, 'created_at'>[] = [
     default_keywords: [
       'Morpheus8', 'RF Microneedling', 'Fillers', 'Botox', 'Laser Resurfacing',
       'CoolSculpting', 'EmSculpt', 'Ultherapy', 'Kybella', 'PRP',
+      'Sylfirm X', 'AviClear', 'Skinvive', 'Profhilo', 'Polynucleotides',
+      'InstaLift', 'Sculptra', 'Renuvion', 'J-Plasma', 'Emface',
+      'Exion', 'FaceTite', 'Thermage FLX', 'Sofwave', 'Genius RF',
+      'Profound RF', 'Scarlet RF', 'Potenza RF Microneedling',
     ],
   },
   {
@@ -88,8 +92,10 @@ export default async function NewListPage() {
 
   return (
     <div className="p-8 max-w-2xl">
-      <h1 className="text-xl font-semibold text-[#2E3A59] mb-1">New Prospect List</h1>
-      <p className="text-sm text-gray-500 mb-6">Upload a CSV of website URLs to qualify.</p>
+      <div className="mb-8">
+        <h1 className="text-2xl font-bold text-[#2E3A59] mb-1">New Prospect List</h1>
+        <p className="text-sm text-gray-500">Upload a CSV, pick your criteria, and let LeadPulse qualify each prospect automatically.</p>
+      </div>
       <HowItWorks />
       <NewListForm templates={templates} />
     </div>

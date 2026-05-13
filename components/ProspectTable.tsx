@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, Fragment } from 'react'
 import type { Prospect, IntelData } from '@/types'
 import ScoreBadge from './ScoreBadge'
 import ScrapeStatusBadge from './ScrapeStatusBadge'
@@ -10,6 +10,7 @@ import IntelCard from './IntelCard'
 interface Props {
   prospects: Prospect[]
   listId: string
+  userId: string
   keywords: string[]
   criteria: string[]
   isPro?: boolean
@@ -109,6 +110,7 @@ interface SyncToast {
 export default function ProspectTable({
   prospects: initial,
   listId,
+  userId,
   criteria,
   isPro,
   hasHubspotKey,
@@ -251,12 +253,14 @@ export default function ProspectTable({
       const res = await fetch('/api/hubspot/sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prospect_ids: idsToSync, list_id: listId }),
+        body: JSON.stringify({ prospectIds: idsToSync, userId }),
       })
       const json = await res.json()
 
       if (res.ok) {
-        const syncedSet = new Set<string>(json.synced_ids ?? [])
+        const failedIds = new Set<string>((json.errors ?? []).map((e: { prospectId: string }) => e.prospectId))
+        const syncedIds = idsToSync.filter((id) => !failedIds.has(id))
+        const syncedSet = new Set<string>(syncedIds)
         const now = new Date().toISOString()
         setProspects((prev) =>
           prev.map((p) => (syncedSet.has(p.id) ? { ...p, hubspot_synced_at: now } : p))
@@ -460,9 +464,8 @@ export default function ProspectTable({
             </thead>
             <tbody className="divide-y divide-gray-50">
               {sorted.map((p) => (
-                <>
+                <Fragment key={p.id}>
                   <tr
-                    key={p.id}
                     className="hover:bg-gray-50/50 cursor-pointer transition-colors"
                     onClick={() => setExpanded(expanded === p.id ? null : p.id)}
                   >
@@ -797,7 +800,7 @@ export default function ProspectTable({
                       </td>
                     </tr>
                   )}
-                </>
+                </Fragment>
               ))}
             </tbody>
           </table>

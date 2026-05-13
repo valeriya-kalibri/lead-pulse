@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import type { ProspectList } from '@/types'
+import DeleteListButton from './DeleteListButton'
 
 function StatusPill({ status }: { status: ProspectList['status'] }) {
   const map = {
@@ -92,6 +93,7 @@ export default async function DashboardPage() {
                 <th className="text-right px-4 py-3 font-medium text-gray-500">Warm</th>
                 <th className="text-left px-4 py-3 font-medium text-gray-500">Status</th>
                 <th className="text-left px-4 py-3 font-medium text-gray-500">Created</th>
+                <th className="px-4 py-3" />
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
@@ -111,6 +113,9 @@ export default async function DashboardPage() {
                   </td>
                   <td className="px-4 py-3 text-gray-400">
                     {new Date(list.created_at).toLocaleDateString()}
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <DeleteListButton listId={list.id} listName={list.name} />
                   </td>
                 </tr>
               ))}

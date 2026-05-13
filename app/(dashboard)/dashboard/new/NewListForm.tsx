@@ -9,6 +9,33 @@ interface Props {
   templates: IndustryTemplate[]
 }
 
+function StepCard({
+  step,
+  title,
+  subtitle,
+  children,
+}: {
+  step: number
+  title: string
+  subtitle?: string
+  children: React.ReactNode
+}) {
+  return (
+    <div className="rounded-xl border border-gray-200 bg-white overflow-hidden">
+      <div className="flex items-center gap-3 px-5 py-4 border-b border-gray-100 bg-[#F5F7FF]">
+        <span className="flex-shrink-0 w-7 h-7 rounded-full bg-[#2E3A59] text-white text-xs font-semibold flex items-center justify-center">
+          {step}
+        </span>
+        <div>
+          <p className="text-sm font-semibold text-[#2E3A59]">{title}</p>
+          {subtitle && <p className="text-xs text-gray-400 mt-0.5">{subtitle}</p>}
+        </div>
+      </div>
+      <div className="px-5 py-4">{children}</div>
+    </div>
+  )
+}
+
 export default function NewListForm({ templates }: Props) {
   const router = useRouter()
   const [name, setName] = useState('')
@@ -81,205 +108,220 @@ export default function NewListForm({ templates }: Props) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
-      {/* List name */}
-      <div>
-        <label className="block text-sm font-medium text-[#2E3A59] mb-1">List name</label>
+    <form onSubmit={handleSubmit} className="space-y-4">
+      {/* Step 1 — List name */}
+      <StepCard step={1} title="Name your list" subtitle="Give this run a clear label for easy reference later.">
         <input
           type="text"
           required
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder="e.g. Med Spas — Chicago Q2"
-          className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-[#2E3A59] focus:outline-none focus:ring-2 focus:ring-[#AABFFF]"
+          className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm text-[#2E3A59] placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#AABFFF] focus:border-transparent"
         />
-      </div>
+      </StepCard>
 
-      {/* Industry template */}
-      <div>
-        <label className="block text-sm font-medium text-[#2E3A59] mb-2">Industry template</label>
+      {/* Step 2 — Industry template */}
+      <StepCard step={2} title="Select an industry" subtitle="Loads a curated keyword set for that vertical.">
         <div className="flex flex-wrap gap-2">
           {templates.map((t) => (
             <button
               key={t.id}
               type="button"
               onClick={() => selectTemplate(t)}
-              className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
+              className={`rounded-lg border px-4 py-2 text-sm font-medium transition-all ${
                 selectedTemplate?.id === t.id
-                  ? 'border-[#2E3A59] bg-[#2E3A59] text-white'
-                  : 'border-gray-200 bg-white text-gray-600 hover:border-[#2E3A59]'
+                  ? 'border-[#2E3A59] bg-[#2E3A59] text-white shadow-sm'
+                  : 'border-gray-200 bg-white text-gray-600 hover:border-[#AABFFF] hover:text-[#2E3A59]'
               }`}
             >
               {t.name}
             </button>
           ))}
         </div>
-      </div>
+      </StepCard>
 
-      {/* Keywords */}
-      <div>
-        <label className="block text-sm font-medium text-[#2E3A59] mb-2">
-          Service keywords{' '}
-          <span className="font-normal text-gray-400">(what you&apos;re qualifying for)</span>
-        </label>
-        <div className="flex flex-wrap gap-1.5 mb-2">
-          {keywords.map((kw) => (
-            <span
-              key={kw}
-              className="inline-flex items-center gap-1 rounded-full bg-[#AABFFF]/20 px-2.5 py-1 text-xs font-medium text-[#2E3A59]"
-            >
-              {kw}
-              <button
-                type="button"
-                onClick={() => removeKeyword(kw)}
-                className="hover:text-red-500"
+      {/* Step 3 — Keywords */}
+      <StepCard
+        step={3}
+        title="Service keywords"
+        subtitle="Terms that signal this prospect needs what you sell."
+      >
+        {keywords.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 mb-3 p-3 rounded-lg bg-[#F5F7FF] border border-[#AABFFF]/30">
+            {keywords.map((kw) => (
+              <span
+                key={kw}
+                className="inline-flex items-center gap-1 rounded-full bg-[#2E3A59] px-3 py-1 text-xs font-medium text-white"
               >
-                ×
-              </button>
-            </span>
-          ))}
-        </div>
+                {kw}
+                <button
+                  type="button"
+                  onClick={() => removeKeyword(kw)}
+                  className="ml-0.5 opacity-60 hover:opacity-100 transition-opacity"
+                  aria-label={`Remove ${kw}`}
+                >
+                  ×
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
         <div className="flex gap-2">
           <input
             type="text"
             value={keywordInput}
             onChange={(e) => setKeywordInput(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addKeyword())}
-            placeholder="Add keyword and press Enter"
-            className="flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm text-[#2E3A59] focus:outline-none focus:ring-2 focus:ring-[#AABFFF]"
+            placeholder="Type a keyword and press Enter…"
+            className="flex-1 rounded-lg border border-gray-200 px-3 py-2.5 text-sm text-[#2E3A59] placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#AABFFF] focus:border-transparent"
           />
           <button
             type="button"
             onClick={addKeyword}
-            className="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-600 hover:border-[#2E3A59] transition-colors"
+            className="rounded-lg border border-gray-200 px-4 py-2.5 text-sm font-medium text-[#2E3A59] hover:bg-[#F5F7FF] hover:border-[#AABFFF] transition-colors"
           >
             Add
           </button>
         </div>
-      </div>
+      </StepCard>
 
-      {/* Qualification criteria */}
-      <div>
-        <div className="flex items-center justify-between mb-2">
-          <label className="block text-sm font-medium text-[#2E3A59]">
-            Qualification criteria
-          </label>
-          <div className="flex gap-3 text-xs">
-            <button
-              type="button"
-              onClick={() => setCriteria([...ALL_CRITERIA])}
-              className="text-[#2E3A59] hover:underline"
-            >
-              Select all
-            </button>
-            <button
-              type="button"
-              onClick={() => setCriteria([])}
-              className="text-gray-400 hover:underline"
-            >
-              Clear all
-            </button>
-          </div>
+      {/* Step 4 — Criteria */}
+      <StepCard step={4} title="Qualification criteria" subtitle="Only checked items will be scraped, scored, and shown as columns.">
+        <div className="flex gap-3 text-xs mb-3">
+          <button
+            type="button"
+            onClick={() => setCriteria([...ALL_CRITERIA])}
+            className="text-[#2E3A59] font-medium hover:underline"
+          >
+            Select all
+          </button>
+          <span className="text-gray-300">|</span>
+          <button
+            type="button"
+            onClick={() => setCriteria([])}
+            className="text-gray-400 hover:underline"
+          >
+            Clear all
+          </button>
+          <span className="ml-auto text-gray-400">{criteria.length} of {CRITERIA_LIST.length} selected</span>
         </div>
-        <p className="text-xs text-gray-400 mb-3">
-          Only checked criteria will be scraped, scored, and shown as columns in results.
-        </p>
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
           {CRITERIA_LIST.map((c) => {
             const checked = criteria.includes(c.id)
             return (
               <label
                 key={c.id}
-                className={`flex items-start gap-3 rounded-lg border px-3 py-2.5 cursor-pointer transition-colors ${
+                className={`flex items-start gap-3 rounded-lg border px-3 py-3 cursor-pointer transition-all ${
                   checked
-                    ? 'border-[#AABFFF] bg-[#AABFFF]/8'
-                    : 'border-gray-200 bg-white hover:border-gray-300'
+                    ? 'border-[#AABFFF] bg-[#AABFFF]/10 shadow-[inset_0_0_0_1px_#AABFFF]'
+                    : 'border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50'
                 }`}
               >
-                <input
-                  type="checkbox"
-                  checked={checked}
-                  onChange={() => toggleCriterion(c.id)}
-                  className="mt-0.5 h-4 w-4 rounded border-gray-300 text-[#2E3A59] accent-[#2E3A59]"
-                />
+                <span
+                  className={`flex-shrink-0 mt-0.5 w-4 h-4 rounded border flex items-center justify-center transition-colors ${
+                    checked ? 'bg-[#2E3A59] border-[#2E3A59]' : 'border-gray-300 bg-white'
+                  }`}
+                >
+                  {checked && (
+                    <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 10 10">
+                      <path d="M1.5 5L4 7.5L8.5 2.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  )}
+                </span>
                 <div className="min-w-0">
-                  <p className="text-xs font-medium text-[#2E3A59]">{c.label}</p>
-                  <p className="text-xs text-gray-400 mt-0.5">{c.description}</p>
+                  <p className={`text-xs font-semibold ${checked ? 'text-[#2E3A59]' : 'text-gray-600'}`}>{c.label}</p>
+                  <p className="text-xs text-gray-400 mt-0.5 leading-relaxed">{c.description}</p>
                 </div>
               </label>
             )
           })}
         </div>
-      </div>
+      </StepCard>
 
-      {/* CSV upload */}
-      <div>
-        <label className="block text-sm font-medium text-[#2E3A59] mb-2">
-          Upload CSV{' '}
-          <span className="font-normal text-gray-400">(one website URL per row)</span>
-        </label>
+      {/* Step 5 — CSV upload */}
+      <StepCard step={5} title="Upload your CSV" subtitle="One website URL per row. Business name and other fields are optional.">
         <div
           onDrop={handleDrop}
-          onDragOver={(e) => {
-            e.preventDefault()
-            setDragOver(true)
-          }}
+          onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
           onDragLeave={() => setDragOver(false)}
-          className={`flex flex-col items-center justify-center rounded-xl border-2 border-dashed p-8 text-center transition-colors ${
-            dragOver ? 'border-[#AABFFF] bg-[#AABFFF]/5' : 'border-gray-200 bg-white'
+          className={`relative flex flex-col items-center justify-center rounded-xl border-2 border-dashed p-10 text-center transition-all ${
+            dragOver
+              ? 'border-[#2E3A59] bg-[#AABFFF]/8 scale-[1.01]'
+              : file
+              ? 'border-[#AABFFF] bg-[#AABFFF]/5'
+              : 'border-gray-200 bg-[#F5F7FF] hover:border-gray-300'
           }`}
         >
           {file ? (
-            <div>
-              <p className="text-sm font-medium text-[#2E3A59]">{file.name}</p>
+            <div className="flex flex-col items-center gap-2">
+              <div className="w-10 h-10 rounded-full bg-[#2E3A59]/10 flex items-center justify-center">
+                <svg className="w-5 h-5 text-[#2E3A59]" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-[#2E3A59]">{file.name}</p>
+                <p className="text-xs text-gray-400 mt-0.5">{(file.size / 1024).toFixed(1)} KB</p>
+              </div>
               <button
                 type="button"
                 onClick={() => setFile(null)}
-                className="mt-1 text-xs text-gray-400 hover:text-red-500"
+                className="text-xs text-gray-400 hover:text-red-500 transition-colors mt-1"
               >
-                Remove
+                Remove file
               </button>
             </div>
           ) : (
             <>
-              <svg
-                className="w-8 h-8 text-gray-300 mb-2"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth={1.5}
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"
-                />
-              </svg>
-              <p className="text-sm text-gray-500">Drag & drop your CSV or</p>
-              <label className="mt-1 cursor-pointer text-sm text-[#2E3A59] font-medium hover:underline">
-                browse
-                <input
-                  type="file"
-                  accept=".csv"
-                  className="sr-only"
-                  onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-                />
-              </label>
+              <div className="w-12 h-12 rounded-full bg-white border border-gray-200 flex items-center justify-center mb-3 shadow-sm">
+                <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+                </svg>
+              </div>
+              <p className="text-sm font-medium text-[#2E3A59]">Drop your CSV here</p>
+              <p className="text-xs text-gray-400 mt-1">or{' '}
+                <label className="cursor-pointer text-[#2E3A59] font-semibold underline underline-offset-2">
+                  browse to upload
+                  <input
+                    type="file"
+                    accept=".csv"
+                    className="sr-only"
+                    onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+                  />
+                </label>
+              </p>
+              <p className="text-xs text-gray-300 mt-3">.csv files only</p>
             </>
           )}
         </div>
-      </div>
+      </StepCard>
 
       {error && (
-        <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</p>
+        <div className="flex items-start gap-2.5 rounded-lg bg-red-50 border border-red-200 px-4 py-3">
+          <svg className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+          </svg>
+          <p className="text-sm text-red-700">{error}</p>
+        </div>
       )}
 
       <button
         type="submit"
-        disabled={loading || !file || !selectedTemplate}
-        className="w-full rounded-lg bg-[#2E3A59] px-4 py-2.5 text-sm font-medium text-white hover:bg-[#3a4a6e] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        disabled={loading || !file}
+        className="w-full rounded-xl bg-[#2E3A59] px-4 py-3 text-sm font-semibold text-white hover:bg-[#3a4a6e] disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-sm hover:shadow-md"
       >
-        {loading ? 'Processing…' : 'Start qualification'}
+        {loading ? (
+          <span className="flex items-center justify-center gap-2">
+            <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            </svg>
+            Processing…
+          </span>
+        ) : (
+          'Start qualification →'
+        )}
       </button>
     </form>
   )

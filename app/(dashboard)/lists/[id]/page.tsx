@@ -61,7 +61,14 @@ export default async function ListPage({ params }: Props) {
             <p className="text-sm text-gray-400 mt-0.5">{pl.industry_name}</p>
           )}
         </div>
-        <ListActions listId={pl.id} listName={pl.name} />
+        <ListActions
+          listId={pl.id}
+          listName={pl.name}
+          userId={user.id}
+          prospectIds={ps.filter((p) => p.scrape_status === 'complete').map((p) => p.id)}
+          isPro={isPro}
+          hasHubspotKey={hasHubspotKey}
+        />
       </div>
 
       {/* Summary strip */}
@@ -106,6 +113,7 @@ export default async function ListPage({ params }: Props) {
       <ProspectTable
         prospects={ps}
         listId={pl.id}
+        userId={user.id}
         keywords={pl.service_keywords}
         criteria={criteria}
         isPro={isPro}

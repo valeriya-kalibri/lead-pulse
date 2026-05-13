@@ -74,13 +74,16 @@ export async function POST(req: NextRequest) {
       })()
     : rows
 
-  // Deduplicate URLs within this batch — later occurrences are marked skipped
+  // Deduplicate by URL — drop later occurrences entirely so they never appear in results
   const urlsSeen = new Set<string>()
-  const prospectInserts = allowedRows.map((row) => {
-    const key = row.url.toLowerCase().replace(/\/$/, '')
-    const isSkipped = urlsSeen.has(key)
-    if (!isSkipped) urlsSeen.add(key)
-    return {
+  const prospectInserts = allowedRows
+    .filter((row) => {
+      const key = row.url.toLowerCase().replace(/\/$/, '')
+      if (urlsSeen.has(key)) return false
+      urlsSeen.add(key)
+      return true
+    })
+    .map((row) => ({
       list_id: '', // filled after list is created
       user_id: user.id,
       website_url: row.url,
@@ -92,9 +95,8 @@ export async function POST(req: NextRequest) {
       email: row.email || null,
       city: row.city || null,
       state: row.state || null,
-      scrape_status: (isSkipped ? 'skipped' : 'pending') as 'skipped' | 'pending',
-    }
-  })
+      scrape_status: 'pending' as const,
+    }))
 
   const { data: list, error: listErr } = await db
     .from('prospect_lists')
@@ -108,7 +110,7 @@ export async function POST(req: NextRequest) {
       service_keywords: keywords,
       selected_criteria: criteria,
       status: 'processing',
-      total_prospects: allowedRows.length,
+      total_prospects: prospectInserts.length,
     })
     .select('id')
     .single()
@@ -117,16 +119,24 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Failed to create list' }, { status: 500 })
   }
 
-  await db
+  const { error: insertError } = await db
     .from('prospects')
     .insert(prospectInserts.map((p) => ({ ...p, list_id: list.id })))
+
+  if (insertError) {
+    await db.from('prospect_lists').delete().eq('id', list.id)
+    return NextResponse.json(
+      { error: `Failed to import prospects: ${insertError.message}` },
+      { status: 500 }
+    )
+  }
 
   const { data: job } = await db
     .from('scrape_jobs')
     .insert({
       list_id: list.id,
       user_id: user.id,
-      total_urls: allowedRows.length,
+      total_urls: prospectInserts.length,
       processed_urls: 0,
       failed_urls: 0,
       status: 'running',
@@ -179,10 +189,22 @@ async function processJob(
     totalMs += Date.now() - t0
 
     if (result.success && result.data) {
-      await db.from('prospects').update({ ...result.data }).eq('id', prospect.id)
-      if (result.data.score === 'hot') hot++
-      else if (result.data.score === 'warm') warm++
-      else cold++
+      const { error: updateErr } = await db
+        .from('prospects')
+        .update({ ...result.data })
+        .eq('id', prospect.id)
+      if (updateErr) {
+        console.error(`[scrape] DB update failed for ${prospect.website_url}:`, updateErr.message)
+        await db
+          .from('prospects')
+          .update({ scrape_status: 'error', scrape_error: `DB write failed: ${updateErr.message}`, score: 'cold' })
+          .eq('id', prospect.id)
+        failed++
+      } else {
+        if (result.data.score === 'hot') hot++
+        else if (result.data.score === 'warm') warm++
+        else cold++
+      }
     } else {
       const et: ErrorType = result.errorType ?? 'UNKNOWN'
       errorTypeCounts[et] = (errorTypeCounts[et] ?? 0) + 1
