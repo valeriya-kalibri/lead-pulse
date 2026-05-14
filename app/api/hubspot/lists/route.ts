@@ -35,17 +35,50 @@ export async function GET(req: NextRequest) {
   const hsHeaders = { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' }
 
   if (type === 'hubspot') {
-    // Fetch HubSpot Company Lists
-    const res = await fetch(`${HS_BASE}/crm/v3/lists?objectType=COMPANY&count=250`, {
-      headers: hsHeaders,
-    })
-    if (!res.ok) return NextResponse.json({ error: 'Failed to fetch HubSpot lists' }, { status: 502 })
-    const data = await res.json()
-    const lists = (data.lists ?? []).map((l: { listId: number | string; name: string }) => ({
-      id: String(l.listId),
-      name: l.name,
-    }))
-    return NextResponse.json({ lists })
+    const allLists: { id: string; name: string; objectTypeId: string | null }[] = []
+
+    // 1 — v3 GET (returns lists if crm.lists.read scope is active)
+    const v3Res = await fetch(`${HS_BASE}/crm/v3/lists?count=250`, { headers: hsHeaders })
+    if (v3Res.ok) {
+      const v3Data = await v3Res.json()
+      for (const l of v3Data.lists ?? []) {
+        allLists.push({ id: String(l.listId), name: l.name, objectTypeId: l.objectTypeId ?? null })
+      }
+    }
+
+    // 2 — v3 search (sometimes returns company lists when GET doesn't)
+    if (allLists.length === 0) {
+      for (const objectTypeId of ['0-2', '0-1']) {
+        const searchRes = await fetch(`${HS_BASE}/crm/v3/lists/search`, {
+          method: 'POST',
+          headers: hsHeaders,
+          body: JSON.stringify({ objectTypeId, query: '', count: 250 }),
+        })
+        if (searchRes.ok) {
+          const searchData = await searchRes.json()
+          for (const l of searchData.lists ?? searchData.results ?? []) {
+            allLists.push({ id: String(l.listId ?? l.id), name: l.name, objectTypeId })
+          }
+        }
+      }
+    }
+
+    // 3 — v1 contacts fallback (always works, contact lists only)
+    if (allLists.length === 0) {
+      const v1Res = await fetch(`${HS_BASE}/contacts/v1/lists?count=250`, { headers: hsHeaders })
+      if (v1Res.ok) {
+        const v1Data = await v1Res.json()
+        for (const l of v1Data.lists ?? []) {
+          allLists.push({ id: String(l.listId), name: l.name, objectTypeId: '0-1' })
+        }
+      }
+    }
+
+    if (allLists.length === 0) {
+      return NextResponse.json({ error: 'No HubSpot lists found. Try reconnecting HubSpot in Settings.' }, { status: 502 })
+    }
+
+    return NextResponse.json({ lists: allLists })
   }
 
   // type === 'leadpulse' — distinct leadpulse_list_name values from HubSpot companies

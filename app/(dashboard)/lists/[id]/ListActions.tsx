@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import HubSpotPullModal from '@/components/HubSpotPullModal'
+import StartScrapingModal from '@/components/StartScrapingModal'
 
 interface Props {
   listId: string
@@ -11,13 +12,39 @@ interface Props {
   prospectIds: string[]
   isPro: boolean
   hasHubspotKey: boolean
+  hasPendingProspects: boolean
+  isJobActive: boolean
+  listKeywords: string[]
+  listCriteria: string[]
 }
 
-export default function ListActions({ listId, listName, userId, prospectIds, isPro, hasHubspotKey }: Props) {
+export default function ListActions({ listId, listName, userId, prospectIds, isPro, hasHubspotKey, hasPendingProspects, isJobActive, listKeywords, listCriteria }: Props) {
   const router = useRouter()
   const [deleting, setDeleting] = useState(false)
+  const [scraping, setScraping] = useState(false)
+  const [showScrapingModal, setShowScrapingModal] = useState(false)
   const [syncing, setSyncing] = useState(false)
   const [syncResult, setSyncResult] = useState<{ synced: number; failed: number; errors: Array<{ prospectId: string; error: string }> } | null>(null)
+
+  async function handleStartScraping(keywords: string[], criteria: string[]) {
+    setScraping(true)
+    try {
+      const res = await fetch(`/api/lists/${listId}/scrape`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ keywords, criteria }),
+      })
+      if (!res.ok) {
+        const { error } = await res.json()
+        alert(error ?? 'Failed to start scraping')
+        return
+      }
+      setShowScrapingModal(false)
+      router.refresh()
+    } finally {
+      setScraping(false)
+    }
+  }
 
   async function handleDelete() {
     if (!confirm(`Delete "${listName}"? This will permanently remove all prospects and results. This cannot be undone.`)) return
@@ -64,12 +91,37 @@ export default function ListActions({ listId, listName, userId, prospectIds, isP
     : null
 
   return (
+    <>
+      <StartScrapingModal
+        isOpen={showScrapingModal}
+        onClose={() => setShowScrapingModal(false)}
+        listName={listName}
+        initialKeywords={listKeywords}
+        initialCriteria={listCriteria}
+        onConfirm={handleStartScraping}
+        confirming={scraping}
+      />
+
     <div className="flex items-center gap-2">
-      {/* HubSpot pull */}
+      {/* Start Scraping — shown for HubSpot-imported lists with unscraped prospects */}
+      {hasPendingProspects && !isJobActive && (
+        <button
+          onClick={() => setShowScrapingModal(true)}
+          disabled={scraping}
+          className="inline-flex items-center gap-1.5 rounded-lg bg-[#2E3A59] px-3 py-2 text-sm font-medium text-white hover:bg-[#3a4a6e] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 010 1.972l-11.54 6.347a1.125 1.125 0 01-1.667-.986V5.653z" />
+          </svg>
+          Start Scraping
+        </button>
+      )}
+
+      {/* HubSpot refresh */}
       <HubSpotPullModal
+        listId={listId}
+        listName={listName}
         userId={userId}
-        currentListId={listId}
-        currentListName={listName}
         isPro={isPro}
         hasHubspotKey={hasHubspotKey}
       />
@@ -135,5 +187,6 @@ export default function ListActions({ listId, listName, userId, prospectIds, isP
         {deleting ? 'Deleting…' : 'Delete List'}
       </button>
     </div>
+    </>
   )
 }

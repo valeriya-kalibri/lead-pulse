@@ -51,6 +51,8 @@ export default async function ListPage({ params }: Props) {
   const isPro = profile?.plan === 'pro'
   const hasHubspotKey = Boolean(profile?.hubspot_access_token)
   const hubspotPortalId = (profile?.hubspot_portal_id as string | null) ?? null
+  const hasPendingProspects = ps.some((p) => p.scrape_status === 'pending')
+  const isJobActive = Boolean(sj && sj.status !== 'complete')
 
   return (
     <div className="p-8">
@@ -68,6 +70,10 @@ export default async function ListPage({ params }: Props) {
           prospectIds={ps.filter((p) => p.scrape_status === 'complete').map((p) => p.id)}
           isPro={isPro}
           hasHubspotKey={hasHubspotKey}
+          hasPendingProspects={hasPendingProspects}
+          isJobActive={isJobActive}
+          listKeywords={pl.service_keywords ?? []}
+          listCriteria={pl.selected_criteria ?? criteria}
         />
       </div>
 

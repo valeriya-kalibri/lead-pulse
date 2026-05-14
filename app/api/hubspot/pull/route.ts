@@ -120,18 +120,26 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => null)
   const {
     userId,
-    source,           // 'hubspot_list' | 'leadpulse_list'
-    hubspotListId,    // required for hubspot_list
-    hubspotListName,  // required for hubspot_list (to name the new LP list)
-    currentListId,    // the LeadPulse list the user is on
-    currentListName,  // used as the leadpulse_list_name filter
+    source,                    // 'hubspot_list' | 'leadpulse_list'
+    hubspotListId,             // required for hubspot_list
+    hubspotListName,           // required for hubspot_list (to name the new LP list)
+    hubspotListObjectTypeId,   // '0-1' = contact list, '0-2' = company list
+    industryTemplateId,        // optional for hubspot_list — stored on the new list
+    industryName,              // optional for hubspot_list
+    serviceKeywords,           // optional for hubspot_list (string[])
+    selectedCriteria,          // optional for hubspot_list (string[])
+    currentListId,             // required for leadpulse_list
+    currentListName,           // required for leadpulse_list (leadpulse_list_name filter)
   } = body ?? {}
 
-  if (!userId || !source || !currentListId || !currentListName) {
+  if (!userId || !source) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
   }
   if (source === 'hubspot_list' && (!hubspotListId || !hubspotListName)) {
     return NextResponse.json({ error: 'Missing hubspotListId or hubspotListName' }, { status: 400 })
+  }
+  if (source === 'leadpulse_list' && (!currentListId || !currentListName)) {
+    return NextResponse.json({ error: 'Missing currentListId or currentListName' }, { status: 400 })
   }
 
   const { data: profile } = await db
@@ -156,25 +164,67 @@ export async function POST(req: NextRequest) {
 
   const hsHeaders = { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' }
 
-  // ── Collect company IDs from HubSpot ───────────────────────────────────────
+  // ── Collect contact IDs from HubSpot list ────────────────────────────────
+  // For contact lists (v1 IDs): use v1 contacts endpoint — works without crm.lists.read
+  // For company lists (v3 IDs): use v3 memberships endpoint
 
-  const companyIds: string[] = []
+  const contactIdsFromList: string[] = []
+  const companyIdsFromList: string[] = []
 
   if (source === 'hubspot_list') {
-    // Paginate through HubSpot list memberships
-    let after: string | null = null
-    while (true) {
-      const res = await fetch(
-        `${HS_BASE}/crm/v3/lists/${hubspotListId}/memberships?limit=100${after ? `&after=${after}` : ''}`,
-        { headers: hsHeaders }
-      )
-      if (!res.ok) break
-      const data = await res.json() as { results?: { recordId: unknown }[]; paging?: { next?: { after?: string } } }
-      for (const m of data.results ?? []) companyIds.push(String(m.recordId))
-      after = data.paging?.next?.after ?? null
-      if (!after) break
+    if (hubspotListObjectTypeId === '0-1' || hubspotListObjectTypeId === null) {
+      // Contact list — use v1 endpoint which works with crm.objects.contacts.read
+      let vidOffset: number | null = null
+      while (true) {
+        const url = `${HS_BASE}/contacts/v1/lists/${hubspotListId}/contacts/all?count=100${vidOffset ? `&vid-offset=${vidOffset}` : ''}`
+        const res = await fetch(url, { headers: hsHeaders })
+        if (!res.ok) break
+        const data = await res.json() as { contacts?: { vid: unknown }[]; 'has-more'?: boolean; 'vid-offset'?: number }
+        for (const c of data.contacts ?? []) contactIdsFromList.push(String(c.vid))
+        if (!data['has-more']) break
+        vidOffset = data['vid-offset'] ?? null
+        if (!vidOffset) break
+      }
+    } else {
+      // Company list — use v3 memberships endpoint
+      let after: string | null = null
+      while (true) {
+        const res = await fetch(
+          `${HS_BASE}/crm/v3/lists/${hubspotListId}/memberships?limit=100${after ? `&after=${after}` : ''}`,
+          { headers: hsHeaders }
+        )
+        if (!res.ok) break
+        const data = await res.json() as { results?: { recordId: unknown }[]; paging?: { next?: { after?: string } } }
+        for (const m of data.results ?? []) companyIdsFromList.push(String(m.recordId))
+        after = data.paging?.next?.after ?? null
+        if (!after) break
+      }
     }
-  } else {
+  }
+
+  // ── Resolve to company IDs ────────────────────────────────────────────────
+
+  const companyIds: string[] = [...companyIdsFromList]
+
+  if (contactIdsFromList.length > 0) {
+    // Contact list — look up associated company for each contact
+    for (let i = 0; i < contactIdsFromList.length; i += 100) {
+      const chunk = contactIdsFromList.slice(i, i + 100)
+      const res = await fetch(`${HS_BASE}/crm/v4/associations/contacts/companies/batch/read`, {
+        method: 'POST',
+        headers: hsHeaders,
+        body: JSON.stringify({ inputs: chunk.map((id) => ({ id })) }),
+      })
+      if (!res.ok) continue
+      const data = await res.json()
+      for (const r of data.results ?? []) {
+        const companyId = r.to?.[0]?.toObjectId
+        if (companyId) companyIds.push(String(companyId))
+      }
+    }
+  }
+
+  if (source === 'leadpulse_list') {
     // Search companies by leadpulse_list_name
     let after: string | null = null
     while (true) {
@@ -212,20 +262,26 @@ export async function POST(req: NextRequest) {
 
   // ── Determine target list ──────────────────────────────────────────────────
 
-  let targetListId = currentListId
+  let targetListId = currentListId ?? ''
 
   if (source === 'hubspot_list') {
+    const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+    const safeTemplateId = UUID_RE.test(industryTemplateId ?? '') ? industryTemplateId : null
+
     const { data: newList, error } = await db
       .from('prospect_lists')
       .insert({
         user_id: userId,
         name: hubspotListName,
+        industry_template_id: safeTemplateId,
+        industry_name: industryName ?? null,
+        service_keywords: serviceKeywords ?? [],
+        selected_criteria: selectedCriteria ?? null,
         total_prospects: 0,
         hot_count: 0,
         warm_count: 0,
         cold_count: 0,
-        status: 'complete',
-        service_keywords: [],
+        status: 'pending',
       })
       .select('id')
       .single()
