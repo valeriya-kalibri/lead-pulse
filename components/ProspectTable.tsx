@@ -401,7 +401,7 @@ export default function ProspectTable({
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full min-w-[1100px] text-sm">
             <thead>
               <tr className="border-b border-gray-100">
                 <th className="px-4 py-3 w-8">

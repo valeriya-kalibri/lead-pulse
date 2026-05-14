@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
+import HubSpotPullModal from '@/components/HubSpotPullModal'
 
 interface Props {
   listId: string
@@ -64,6 +65,15 @@ export default function ListActions({ listId, listName, userId, prospectIds, isP
 
   return (
     <div className="flex items-center gap-2">
+      {/* HubSpot pull */}
+      <HubSpotPullModal
+        userId={userId}
+        currentListId={listId}
+        currentListName={listName}
+        isPro={isPro}
+        hasHubspotKey={hasHubspotKey}
+      />
+
       {/* HubSpot sync */}
       {syncResult ? (
         <div className="flex flex-col gap-1">

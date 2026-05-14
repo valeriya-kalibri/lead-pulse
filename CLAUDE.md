@@ -8,7 +8,7 @@
 
 LeadPulse is an AI-powered prospect qualification engine. It is designed for agencies, consultants, and sales teams who prospect service businesses at scale using Apollo or HubSpot.
 
-**Core workflow:** Export a prospect list as a CSV → upload to LeadPulse → select industry and qualification criteria → LeadPulse visits every website automatically → detects chatbots, high-ticket services, tech stacks, booking platforms, locations → scores every lead Hot, Warm, or Cold → generate AI Intel Cards for best prospects → export CSV or sync to HubSpot CRM.
+**Core workflow:** Export a prospect list as a CSV (or pull directly from HubSpot) → upload to LeadPulse → select industry and qualification criteria → LeadPulse visits every website automatically → detects chatbots, high-ticket services, tech stacks, booking platforms, locations → scores every lead Hot, Warm, or Cold → generate AI Intel Cards for best prospects → export CSV or push to HubSpot CRM.
 
 **LeadPulse does not replace Apollo. Apollo finds prospects. LeadPulse tells you which ones are worth calling and exactly how to open the conversation.**
 
@@ -39,7 +39,11 @@ LeadPulse is an AI-powered prospect qualification engine. It is designed for age
 /app/api/                   — All server-side API routes
 /app/api/prospects/         — Prospect scraping and scoring routes
 /app/api/prospects/[id]/intel/route.ts  — Intel Card generation
-/app/api/hubspot/sync/route.ts          — HubSpot batch sync
+/app/api/hubspot/sync/route.ts          — HubSpot push (LeadPulse → HubSpot)
+/app/api/hubspot/pull/route.ts          — HubSpot pull (HubSpot → LeadPulse)
+/app/api/hubspot/lists/route.ts         — Fetch available HubSpot lists for pull UI
+/app/api/hubspot/auth/route.ts          — OAuth authorization redirect
+/app/api/hubspot/callback/route.ts      — OAuth callback, stores tokens in profiles
 /app/api/hubspot/setup-properties/route.ts — Auto-create HubSpot custom properties
 /app/debug                  — Debug panel page (/app/debug)
 /lib/scraper/               — All detection modules (see below)
@@ -60,9 +64,11 @@ Extended user data. Auto-created on Supabase Auth signup via trigger.
 | full_name | text | |
 | company_name | text | |
 | plan | text | 'starter' or 'pro' — default 'starter' |
+| role | text | 'admin' or 'user' — default 'user' |
 | hubspot_access_token | text | Pro plan only — HubSpot OAuth access token, obtained via OAuth flow |
 | hubspot_refresh_token | text | Pro plan only — HubSpot OAuth refresh token, used to renew access token |
 | hubspot_token_expires_at | timestamptz | Pro plan only — expiry time of current access token |
+| hubspot_portal_id | text | HubSpot portal ID — used to build direct record links in UI |
 | created_at | timestamptz | auto-managed |
 | updated_at | timestamptz | auto-managed |
 
@@ -590,6 +596,72 @@ PAIN INDICATORS: [pain_indicators]
 
 ---
 
+### HubSpot Pull (Import from HubSpot)
+
+Pull is the reverse of sync — it imports records FROM HubSpot INTO LeadPulse. Pro plan only.
+
+#### Pull Source (dropdown)
+
+| Option | Description |
+|---|---|
+| **HubSpot List** | Pulls from a native HubSpot Company List. Fetches companies + their primary associated Contact via Associations API v4. Creates a new LeadPulse list. |
+| **LeadPulse List** | Queries HubSpot for contacts/companies where `leadpulse_list_name = X`. Distinct list names are fetched live. Merges into the **existing** LeadPulse list of that name. |
+
+#### Pull Flow — HubSpot List
+
+1. Fetch all HubSpot Company Lists via `GET /crm/v3/lists?objectType=COMPANY`
+2. User selects a list — fetch its members via `GET /crm/v3/lists/{listId}/memberships`
+3. For each company, fetch primary associated Contact via `GET /crm/v4/objects/companies/{id}/associations/contacts`
+4. Map to LeadPulse prospect rows (see field mapping below)
+5. Create a new LeadPulse list named after the HubSpot list
+6. Insert all prospects — match on `hubspot_company_id`, then `email`, then root domain
+
+#### Pull Flow — LeadPulse List
+
+1. Query HubSpot for distinct `leadpulse_list_name` values via Search API
+2. User selects a list name — fetch all contacts/companies with that property value
+3. Match each record to an existing prospect in the LeadPulse list (by `hubspot_contact_id`, then `email`, then domain)
+4. Apply conditional upsert (see field ownership rules below)
+5. New records not yet in the list are added as new prospect rows
+
+#### Field Ownership — Pull vs Push
+
+**On Pull (HubSpot → LeadPulse):** HubSpot is source of truth for contact/company data only.
+
+| Field | Action |
+|---|---|
+| `contact_name`, `email`, `phone` | Always update from HubSpot |
+| `business_name`, `city`, `state` | Always update from HubSpot |
+| `employee_count`, `revenue_range` | Always update from HubSpot |
+| `website` / domain | Update only if prospect not yet scraped (`scraped_at IS NULL`) |
+| `score`, `scraped_at`, `intel` | Never overwrite — LeadPulse owns these |
+| `has_chatbot`, `has_online_booking`, `has_contact_form` | Never overwrite |
+| `outreach_hook`, all detected signals | Never overwrite |
+
+**On Push (LeadPulse → HubSpot):** LeadPulse is always source of truth — overwrite all LeadPulse fields unconditionally on both Contact and Company records.
+
+#### HubSpot → LeadPulse Field Mapping (Pull)
+
+| HubSpot Property | LeadPulse Field |
+|---|---|
+| `domain` (Company) | `website` |
+| `name` (Company) | `business_name` |
+| `city` (Company) | `city` |
+| `state` (Company) | `state` |
+| `numberofemployees` (Company) | `employee_count` |
+| `annualrevenue` (Company) | `revenue_range` |
+| `firstname` + `lastname` (Contact) | `contact_name` |
+| `email` (Contact) | `email` |
+| `phone` (Contact) | `phone` |
+| `hs_object_id` (Company) | `hubspot_company_id` |
+| `hs_object_id` (Contact) | `hubspot_contact_id` |
+
+#### Rate Limits
+
+Same 200ms delay between requests as push sync.
+
+---
+
 ## Plans
 
 | | Starter — $49/mo | Pro — $149/mo |
@@ -648,3 +720,5 @@ PAIN INDICATORS: [pain_indicators]
 8. **Rate limits matter** — 500ms delay between scrape requests, 200ms delay between HubSpot sync requests.
 9. **Keywords are stored as `text[]`** on `prospect_lists.service_keywords` — one array field, not individual columns.
 10. **Every list is isolated** — results, exports, and HubSpot sync always scope to the current list only.
+11. **Pull never overwrites enrichment** — on HubSpot pull, never touch `score`, `scraped_at`, `intel`, `outreach_hook`, or any detected signal field. HubSpot owns contact info; LeadPulse owns enrichment.
+12. **Push always overwrites** — on HubSpot push, LeadPulse fields overwrite HubSpot unconditionally. LeadPulse is the source of truth for all enrichment data.

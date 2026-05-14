@@ -10,6 +10,7 @@ const SCOPES = [
   'crm.schemas.contacts.write',
   'crm.schemas.companies.read',
   'crm.schemas.companies.write',
+  'crm.lists.read',
 ].join(' ')
 
 export async function GET() {

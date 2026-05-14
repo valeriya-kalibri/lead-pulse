@@ -95,8 +95,10 @@ export default function HubSpotReference() {
               <p>crm.schemas.contacts.write</p>
               <p>crm.schemas.companies.read</p>
               <p>crm.schemas.companies.write</p>
+              <p>crm.lists.read</p>
             </div>
             <p className="text-xs text-gray-400 italic">Intel is delivered via a custom <code className="font-mono bg-gray-100 px-1 rounded">leadpulse_intel</code> property on Contact and Company — no Notes/Engagements scope is needed.</p>
+            <p className="text-xs text-gray-400 italic"><code className="font-mono bg-gray-100 px-1 rounded">crm.lists.read</code> is required for the Pull from HubSpot feature — fetches Company Lists and their memberships. Users must reconnect HubSpot after this scope is added to the app.</p>
           </Section>
 
           {/* Token management */}
