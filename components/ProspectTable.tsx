@@ -400,9 +400,9 @@ export default function ProspectTable({
           {sorted.length} of {prospects.length} prospects
         </div>
 
-        <div className="overflow-x-auto [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar-track]:bg-gray-50 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-gray-300 hover:[&::-webkit-scrollbar-thumb]:bg-gray-400">
+        <div className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-330px)] [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar-track]:bg-gray-50 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-gray-300 hover:[&::-webkit-scrollbar-thumb]:bg-gray-400">
           <table className="w-full min-w-[1100px] text-sm">
-            <thead>
+            <thead className="sticky top-0 z-10 bg-white">
               <tr className="border-b border-gray-100">
                 <th className="px-4 py-3 w-8">
                   <input
