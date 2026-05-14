@@ -374,7 +374,7 @@ export default function ProspectTable({
             )
           )}
           <a
-            href={`/api/prospects/export?list_id=${listId}`}
+            href={`/api/prospects/export?list_id=${listId}&scores=hot,warm`}
             className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 hover:border-[#2E3A59] hover:text-[#2E3A59] transition-colors whitespace-nowrap"
           >
             <svg
@@ -390,7 +390,7 @@ export default function ProspectTable({
                 d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
               />
             </svg>
-            Export CSV
+            Export Hot + Warm
           </a>
         </div>
       </div>
