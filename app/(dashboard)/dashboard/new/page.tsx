@@ -1,6 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
 import NewListForm from './NewListForm'
-import HowItWorks from './HowItWorks'
 import type { IndustryTemplate } from '@/types'
 import { FALLBACK_TEMPLATES } from '@/lib/templates'
 
@@ -23,7 +22,6 @@ export default async function NewListPage() {
         <h1 className="text-2xl font-bold text-[#2E3A59] mb-1">New Prospect List</h1>
         <p className="text-sm text-gray-500">Upload a CSV, pick your criteria, and let LeadPulse qualify each prospect automatically.</p>
       </div>
-      <HowItWorks />
       <NewListForm templates={templates} />
     </div>
   )

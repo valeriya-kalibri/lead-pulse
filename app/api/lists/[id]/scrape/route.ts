@@ -1,7 +1,9 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse, after } from 'next/server'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { ALL_CRITERIA } from '@/lib/criteria'
 import { processJob } from '@/lib/scraper/processJob'
+
+export const maxDuration = 300
 
 const STARTER_MONTHLY_LIMIT = 250
 
@@ -86,7 +88,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     }).eq('id', listId)
   }
 
-  processJob(listId, job!.id, user.id, keywords, criteria, db).catch(console.error)
+  after(() => processJob(listId, job!.id, user.id, keywords, criteria, db).catch(console.error))
 
   return NextResponse.json({ job_id: job?.id })
 }

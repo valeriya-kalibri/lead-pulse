@@ -4,6 +4,7 @@ import type { IndustryTemplate, ProspectList } from '@/types'
 import { FALLBACK_TEMPLATES } from '@/lib/templates'
 import DeleteListButton from './DeleteListButton'
 import HubSpotImportModal from '@/components/HubSpotImportModal'
+import HowItWorks from '@/components/HowItWorks'
 
 function StatusPill({ status }: { status: ProspectList['status'] }) {
   const map = {
@@ -85,6 +86,8 @@ export default async function DashboardPage() {
           </Link>
         </div>
       </div>
+
+      <HowItWorks />
 
       {!lists || lists.length === 0 ? (
         <div className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-gray-200 bg-white py-20 text-center">

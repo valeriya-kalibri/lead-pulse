@@ -37,6 +37,8 @@ LeadPulse is an AI-powered prospect qualification engine. It is designed for age
 ```
 /app                        — Next.js App Router pages and API routes
 /app/api/                   — All server-side API routes
+/app/api/scrape/route.ts                — CSV upload + scrape (creates new list)
+/app/api/lists/[id]/scrape/route.ts     — Start scraping for an existing HubSpot-imported list
 /app/api/prospects/         — Prospect scraping and scoring routes
 /app/api/prospects/[id]/intel/route.ts  — Intel Card generation
 /app/api/hubspot/sync/route.ts          — HubSpot push (LeadPulse → HubSpot)
@@ -46,8 +48,19 @@ LeadPulse is an AI-powered prospect qualification engine. It is designed for age
 /app/api/hubspot/callback/route.ts      — OAuth callback, stores tokens in profiles
 /app/api/hubspot/setup-properties/route.ts — Auto-create HubSpot custom properties
 /app/debug                  — Debug panel page (/app/debug)
-/lib/scraper/               — All detection modules (see below)
+/app/(dashboard)/dashboard/page.tsx     — My Lists page (shows all lists + HubSpot import button)
+/app/(dashboard)/dashboard/new/         — New list form (CSV upload flow)
+/app/(dashboard)/lists/[id]/page.tsx    — List detail page
+/app/(dashboard)/lists/[id]/ListActions.tsx — Client component: scrape, sync, export, delete buttons
+/components/HubSpotImportModal.tsx      — Import a HubSpot list as a new LeadPulse list (My Lists page)
+/components/HubSpotPullModal.tsx        — Refresh existing list from HubSpot (list detail page)
+/components/StartScrapingModal.tsx      — Configure keywords + criteria before scraping HubSpot-imported list
+/components/ProspectTable.tsx           — Main results table with filtering and inline editing
+/lib/scraper/               — All detection modules + shared job runner
+/lib/scraper/processJob.ts  — Shared scrape job runner (used by both scrape routes)
 /lib/supabase/              — Supabase client helpers
+/lib/criteria.ts            — CRITERIA_LIST and ALL_CRITERIA exports
+/lib/templates.ts           — FALLBACK_TEMPLATES (used when industry_templates table is empty)
 ```
 
 ---
@@ -600,29 +613,50 @@ PAIN INDICATORS: [pain_indicators]
 
 Pull is the reverse of sync — it imports records FROM HubSpot INTO LeadPulse. Pro plan only.
 
-#### Pull Source (dropdown)
+#### Entry points
 
-| Option | Description |
-|---|---|
-| **HubSpot List** | Pulls from a native HubSpot Company List. Fetches companies + their primary associated Contact via Associations API v4. Creates a new LeadPulse list. |
-| **LeadPulse List** | Queries HubSpot for contacts/companies where `leadpulse_list_name = X`. Distinct list names are fetched live. Merges into the **existing** LeadPulse list of that name. |
+| Where | Component | What it does |
+|---|---|---|
+| My Lists page | `HubSpotImportModal` | Import a HubSpot list as a **new** LeadPulse list. User picks a HubSpot list, sets a list name, picks an industry template. Sends `source: 'hubspot_list'` to pull API. |
+| List detail page | `HubSpotPullModal` | Refresh an **existing** LeadPulse list from HubSpot — adds new records, updates contact fields. Sends `source: 'leadpulse_list'` to pull API. |
 
-#### Pull Flow — HubSpot List
+After import, the list is created with `status: 'pending'` and all prospects as `scrape_status: 'pending'`. A **Start Scraping** button appears on the list detail page so the user can configure keywords + criteria before scraping begins (see `StartScrapingModal` below).
 
-1. Fetch all HubSpot Company Lists via `GET /crm/v3/lists?objectType=COMPANY`
-2. User selects a list — fetch its members via `GET /crm/v3/lists/{listId}/memberships`
-3. For each company, fetch primary associated Contact via `GET /crm/v4/objects/companies/{id}/associations/contacts`
-4. Map to LeadPulse prospect rows (see field mapping below)
-5. Create a new LeadPulse list named after the HubSpot list
-6. Insert all prospects — match on `hubspot_company_id`, then `email`, then root domain
+#### Fetching HubSpot Lists — Three-tier fallback (`/api/hubspot/lists`)
 
-#### Pull Flow — LeadPulse List
+HubSpot's list API behaviour varies by token scope. The route tries three methods in order:
 
-1. Query HubSpot for distinct `leadpulse_list_name` values via Search API
-2. User selects a list name — fetch all contacts/companies with that property value
-3. Match each record to an existing prospect in the LeadPulse list (by `hubspot_contact_id`, then `email`, then domain)
-4. Apply conditional upsert (see field ownership rules below)
-5. New records not yet in the list are added as new prospect rows
+1. **v3 GET** — `GET /crm/v3/lists?count=250` (works when `crm.lists.read` is fully active)
+2. **v3 search POST** — `POST /crm/v3/lists/search` with `objectTypeId` filters (works for company segments)
+3. **v1 contacts fallback** — `GET /contacts/v1/lists?count=250` (always works for contact lists)
+
+Each list item returned: `{ id: string, name: string, objectTypeId: string | null }`
+
+`objectTypeId` values:
+- `'0-1'` — contact list → use v1 contacts API for member fetch
+- `'0-2'` — company list → use v3 memberships API for member fetch
+
+#### Pull Flow — HubSpot List (`source: 'hubspot_list'`)
+
+Required body fields: `hubspotListId`, `hubspotListName`, `hubspotListObjectTypeId`, `industryTemplateId` (UUID), `industryName`, `serviceKeywords`, `selectedCriteria`
+
+1. Fetch list members based on `objectTypeId`:
+   - Contact list (`0-1` or null): `GET /contacts/v1/lists/{id}/contacts/all?count=100&vid-offset=...` with pagination. Extract `vid` as contact IDs, then resolve to company IDs via Associations API v4 (`POST /crm/v4/associations/contacts/companies/batch/read`).
+   - Company list (`0-2`): `GET /crm/v3/lists/{id}/memberships?limit=100`
+2. For each company ID, fetch company + primary contact properties
+3. Create a new LeadPulse list with `status: 'pending'`, `industry_template_id` (UUID-validated), `industry_name`, `service_keywords`, `selected_criteria`
+4. Insert prospects with `scrape_status: 'pending'` — ready for the Start Scraping flow
+
+**UUID guard:** `industry_template_id` must be a valid UUID — validated with regex before insert. Falls back to `null` if a slug (e.g. `'med_spa'`) is passed instead, preventing FK constraint failures when FALLBACK_TEMPLATES are used.
+
+#### Pull Flow — LeadPulse List (`source: 'leadpulse_list'`)
+
+Required body fields: `currentListId`, `currentListName`
+
+1. Query HubSpot for companies where `leadpulse_list_name = currentListName`
+2. Match each record to an existing prospect (by `hubspot_company_id`, then `email`, then domain)
+3. Apply conditional upsert (see field ownership rules below)
+4. New records not yet in the list are added as new prospect rows
 
 #### Field Ownership — Pull vs Push
 
@@ -708,6 +742,32 @@ Same 200ms delay between requests as push sync.
 
 ---
 
+## Scraping HubSpot-Imported Lists
+
+When a list is created via HubSpot import, all prospects start as `scrape_status: 'pending'`. No scrape job is created automatically — the user must configure and start it manually.
+
+### Start Scraping flow
+
+1. List detail page (`lists/[id]/page.tsx`) checks: `hasPendingProspects = ps.some(p => p.scrape_status === 'pending')` and `isJobActive = Boolean(sj && sj.status !== 'complete')`
+2. When `hasPendingProspects && !isJobActive`, a **Start Scraping** button appears in `ListActions`
+3. Clicking it opens `StartScrapingModal` — pre-filled with the list's stored `service_keywords` and `selected_criteria`
+4. User reviews/edits keywords (chip editor) and criteria (checkbox grid), then confirms
+5. `ListActions` POSTs to `/api/lists/[id]/scrape` with `{ keywords, criteria }` in the body
+
+### `/api/lists/[id]/scrape` route
+
+- Verifies list ownership and plan limits (Starter: 250/month cap)
+- Counts pending prospects, creates a `scrape_jobs` record with `status: 'running'`
+- Reads `keywords` and `criteria` from request body; if provided, **persists them back to the list** (`service_keywords`, `selected_criteria`) so the list always reflects what was actually scraped
+- Falls back to list's stored values if body fields are absent
+- Calls `processJob()` async (fire-and-forget), returns `{ job_id }`
+
+### Shared `processJob` (`lib/scraper/processJob.ts`)
+
+Used by both `/api/scrape` (CSV upload) and `/api/lists/[id]/scrape` (HubSpot import). Accepts `(listId, jobId, userId, keywords, criteria, db)`. Fetches pending prospects, scrapes each URL sequentially with 500ms delay, updates job progress, updates list hot/warm/cold counts, increments usage via `increment_usage` RPC.
+
+---
+
 ## Important Rules for Claude
 
 1. **Never use booleans** for `has_chatbot`, `has_contact_form`, `has_online_booking` — always `'yes' / 'no' / 'unknown'` as text strings.
@@ -722,3 +782,5 @@ Same 200ms delay between requests as push sync.
 10. **Every list is isolated** — results, exports, and HubSpot sync always scope to the current list only.
 11. **Pull never overwrites enrichment** — on HubSpot pull, never touch `score`, `scraped_at`, `intel`, `outreach_hook`, or any detected signal field. HubSpot owns contact info; LeadPulse owns enrichment.
 12. **Push always overwrites** — on HubSpot push, LeadPulse fields overwrite HubSpot unconditionally. LeadPulse is the source of truth for all enrichment data.
+13. **HubSpot-imported lists start as pending** — `status: 'pending'`, all prospects `scrape_status: 'pending'`. Never auto-start scraping on import. The user must configure keywords + criteria via StartScrapingModal first.
+14. **industry_template_id must be a UUID** — always validate with UUID regex before inserting. Pass `null` if it's a slug. FALLBACK_TEMPLATES in `lib/templates.ts` use slug IDs that are not valid UUIDs.

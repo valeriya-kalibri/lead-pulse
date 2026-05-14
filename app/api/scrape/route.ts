@@ -1,8 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse, after } from 'next/server'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { parseCSV } from '@/lib/csv'
 import { ALL_CRITERIA } from '@/lib/criteria'
 import { processJob } from '@/lib/scraper/processJob'
+
+export const maxDuration = 300
 
 const STARTER_MONTHLY_LIMIT = 250
 
@@ -144,7 +146,7 @@ export async function POST(req: NextRequest) {
     .select('id')
     .single()
 
-  processJob(list.id, job!.id, user.id, keywords, criteria, db).catch(console.error)
+  after(() => processJob(list.id, job!.id, user.id, keywords, criteria, db).catch(console.error))
 
   return NextResponse.json({ list_id: list.id, job_id: job?.id })
 }
