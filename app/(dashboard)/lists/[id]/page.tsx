@@ -4,6 +4,7 @@ import { ALL_CRITERIA } from '@/lib/criteria'
 import type { Prospect, ProspectList, ScrapeJob } from '@/types'
 import ProspectTable from '@/components/ProspectTable'
 import JobSummaryPanel from '@/components/JobSummaryPanel'
+import JobPoller from '@/components/JobPoller'
 import ListActions from './ListActions'
 
 interface Props {
@@ -56,6 +57,7 @@ export default async function ListPage({ params }: Props) {
 
   return (
     <div className="p-8">
+      <JobPoller isActive={isJobActive} />
       <div className="flex items-start justify-between mb-6">
         <div>
           <h1 className="text-xl font-semibold text-[#2E3A59]">{pl.name}</h1>
