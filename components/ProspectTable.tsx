@@ -489,9 +489,6 @@ export default function ProspectTable({
                       {p.score !== 'cold' ? (
                         p.intel ? (
                           <div className="space-y-1">
-                            <p className="text-xs text-gray-600 line-clamp-2 leading-relaxed">
-                              {p.intel.outreach_hook}
-                            </p>
                             <div className="flex items-center gap-2">
                               <button
                                 type="button"
