@@ -192,7 +192,7 @@ Return a JSON object with exactly these fields:
     return NextResponse.json({ error: msg }, { status: 500 })
   }
 
-  await db
+  const { error: saveError } = await db
     .from('prospects')
     .update({
       intel,
@@ -200,6 +200,11 @@ Return a JSON object with exactly these fields:
       outreach_hook: intel.outreach_hook,
     })
     .eq('id', id)
+
+  if (saveError) {
+    console.error('[intel] DB write failed:', saveError.message)
+    return NextResponse.json({ error: `Failed to save intel: ${saveError.message}` }, { status: 500 })
+  }
 
   return NextResponse.json(intel)
 }
