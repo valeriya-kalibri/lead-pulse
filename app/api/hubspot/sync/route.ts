@@ -198,6 +198,26 @@ export async function POST(req: NextRequest) {
         sharedLeadPulseProps.location_count = String(p.location_count)
       }
 
+      // V2 — Email sequence fields
+      if (p.sequence_generated_at) {
+        sharedLeadPulseProps.outreach_email_1_subject = p.outreach_email_subject_1 ?? ''
+        sharedLeadPulseProps.outreach_email_1_body    = p.outreach_email_body_1 ?? ''
+        sharedLeadPulseProps.outreach_email_2_subject = p.outreach_email_subject_2 ?? ''
+        sharedLeadPulseProps.outreach_email_2_body    = p.outreach_email_body_2 ?? ''
+        sharedLeadPulseProps.outreach_email_3_subject = p.outreach_email_subject_3 ?? ''
+        sharedLeadPulseProps.outreach_email_3_body    = p.outreach_email_body_3 ?? ''
+      }
+
+      // Apollo status — capitalize each word
+      const apolloLabel: Record<string, string> = {
+        not_enrolled: 'Not Enrolled',
+        enrolled:     'Enrolled',
+        replied:      'Replied',
+        bounced:      'Bounced',
+        completed:    'Completed',
+      }
+      sharedLeadPulseProps.apollo_sequence_status = apolloLabel[p.apollo_sequence_status] ?? 'Not Enrolled'
+
       // ── Step A — Upsert Company ────────────────────────────────────────────
 
       const domain = extractDomain(p.website_url)
@@ -291,6 +311,9 @@ export async function POST(req: NextRequest) {
         email:     p.email ?? '',
         phone:     p.phone ?? '',
         ...sharedLeadPulseProps,
+        // Contact-only intel fields — standalone for Apollo variable use
+        pain_indicators:       (p.intel as { pain_indicators?: string } | null)?.pain_indicators ?? '',
+        conversation_starters: ((p.intel as { conversation_starters?: string[] } | null)?.conversation_starters ?? []).join(' | '),
       }
       const revC = parseRevenue(p.revenue_range)
       if (revC) rawContactProps.annualrevenue = revC

@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useMemo, Fragment } from 'react'
-import type { Prospect, IntelData } from '@/types'
+import { useState, useMemo, useEffect, Fragment } from 'react'
+import type { Prospect, IntelData, ApolloStatus } from '@/types'
 import ScoreBadge from './ScoreBadge'
 import ScrapeStatusBadge from './ScrapeStatusBadge'
 import FilterBar, { type Filters } from './FilterBar'
@@ -117,6 +117,14 @@ export default function ProspectTable({
   hubspotPortalId,
 }: Props) {
   const [prospects, setProspects] = useState<Prospect[]>(initial)
+
+  // Sync fresh server data into state on every router.refresh() (triggered by JobPoller
+  // while a scrape is active). useState only uses the initial value on first mount, so
+  // without this the table shows stale pre-scrape data until a full page reload.
+  useEffect(() => {
+    setProspects(initial)
+  }, [initial])
+
   const [filters, setFilters] = useState<Filters>({
     score: 'all',
     hasChat: 'all',
@@ -161,6 +169,34 @@ export default function ProspectTable({
     } finally {
       setLoadingIntel(null)
     }
+  }
+
+  function handleSequenceGenerated(
+    prospectId: string,
+    data: {
+      outreach_email_subject_1: string
+      outreach_email_body_1: string
+      outreach_email_subject_2: string
+      outreach_email_body_2: string
+      outreach_email_subject_3: string
+      outreach_email_body_3: string
+    }
+  ) {
+    setProspects((prev) =>
+      prev.map((p) =>
+        p.id === prospectId
+          ? { ...p, ...data, sequence_generated_at: new Date().toISOString() }
+          : p
+      )
+    )
+  }
+
+  function handleApolloStatusChange(prospectId: string, status: ApolloStatus) {
+    setProspects((prev) =>
+      prev.map((p) =>
+        p.id === prospectId ? { ...p, apollo_sequence_status: status } : p
+      )
+    )
   }
 
   const uniqueCities = useMemo(() => {
@@ -708,7 +744,12 @@ export default function ProspectTable({
                   {openIntel === p.id && p.intel && (
                     <tr key={`${p.id}-intel`}>
                       <td colSpan={colCount} className="border-b border-amber-100 bg-amber-50/30 px-6 py-5">
-                        <IntelCard intel={p.intel} />
+                        <IntelCard
+                          intel={p.intel}
+                          prospect={p}
+                          onSequenceGenerated={handleSequenceGenerated}
+                          onApolloStatusChange={handleApolloStatusChange}
+                        />
                       </td>
                     </tr>
                   )}

@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
+import type { ApolloStatus } from '@/types'
 
 interface Props {
   params: Promise<{ id: string }>
 }
 
-const ALLOWED_FIELDS = ['employee_count', 'revenue_range', 'city', 'state'] as const
-type AllowedField = (typeof ALLOWED_FIELDS)[number]
+const APOLLO_STATUSES: ApolloStatus[] = ['not_enrolled', 'enrolled', 'replied', 'bounced', 'completed']
+const EDITABLE_FIELDS = ['employee_count', 'revenue_range', 'city', 'state'] as const
+type EditableField = (typeof EDITABLE_FIELDS)[number]
 
 export async function PATCH(req: NextRequest, { params }: Props) {
   const { id } = await params
@@ -18,11 +20,22 @@ export async function PATCH(req: NextRequest, { params }: Props) {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const body = await req.json()
-  const updates: Partial<Record<AllowedField, string | null>> = {}
+  const updates: Record<string, string | null> = {}
 
-  for (const field of ALLOWED_FIELDS) {
+  for (const field of EDITABLE_FIELDS) {
     if (field in body) {
       updates[field] = body[field] || null
+    }
+  }
+
+  if ('apollo_sequence_status' in body) {
+    const status = body.apollo_sequence_status as ApolloStatus
+    if (!APOLLO_STATUSES.includes(status)) {
+      return NextResponse.json({ error: 'Invalid apollo_sequence_status' }, { status: 400 })
+    }
+    updates.apollo_sequence_status = status
+    if (status === 'enrolled') {
+      updates.apollo_enrolled_at = new Date().toISOString()
     }
   }
 
@@ -32,7 +45,6 @@ export async function PATCH(req: NextRequest, { params }: Props) {
 
   const db = createServiceClient()
 
-  // Verify ownership before updating
   const { data: prospect } = await db
     .from('prospects')
     .select('id')

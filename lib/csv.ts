@@ -213,6 +213,15 @@ export function prospectsToCSV(prospects: Prospect[], criteria: string[] = ALL_C
     base.intel_social_signals = p.intel?.social_signals ?? ''
     base.intel_conversation_starters = (p.intel?.conversation_starters ?? []).join(' | ')
 
+    // V2 — Email sequence fields
+    base.outreach_email_subject_1 = p.outreach_email_subject_1 ?? ''
+    base.outreach_email_body_1    = p.outreach_email_body_1 ?? ''
+    base.outreach_email_subject_2 = p.outreach_email_subject_2 ?? ''
+    base.outreach_email_body_2    = p.outreach_email_body_2 ?? ''
+    base.outreach_email_subject_3 = p.outreach_email_subject_3 ?? ''
+    base.outreach_email_body_3    = p.outreach_email_body_3 ?? ''
+    base.apollo_sequence_status   = p.apollo_sequence_status ?? 'not_enrolled'
+
     // Criteria-gated scraped fields
     if (criteria.includes('chatbot')) {
       base.has_chatbot = p.has_chatbot ?? ''

@@ -1,6 +1,8 @@
 export type Plan = 'starter' | 'pro'
 export type Role = 'admin' | 'user'
 export type YesNoUnknown = 'yes' | 'no' | 'unknown'
+export type ApolloStatus = 'not_enrolled' | 'enrolled' | 'replied' | 'bounced' | 'completed'
+export type ScrapeSource = 'node_fetch' | 'playwright'
 export type ErrorType =
   | 'TIMEOUT'
   | 'BLOCKED'
@@ -42,6 +44,10 @@ export interface Profile {
   hubspot_refresh_token: string | null
   hubspot_token_expires_at: string | null
   hubspot_portal_id: string | null
+  stripe_customer_id: string | null
+  stripe_subscription_id: string | null
+  stripe_subscription_status: string | null
+  plan_expires_at: string | null
   created_at: string
   updated_at: string
 }
@@ -106,6 +112,16 @@ export interface Prospect {
   scraped_at: string | null
   intel: IntelData | null
   intel_generated_at: string | null
+  outreach_email_subject_1: string | null
+  outreach_email_body_1: string | null
+  outreach_email_subject_2: string | null
+  outreach_email_body_2: string | null
+  outreach_email_subject_3: string | null
+  outreach_email_body_3: string | null
+  sequence_generated_at: string | null
+  apollo_sequence_status: ApolloStatus
+  apollo_enrolled_at: string | null
+  scrape_source: ScrapeSource | null
   hubspot_contact_id: string | null
   hubspot_company_id: string | null
   hubspot_synced_at: string | null
@@ -133,6 +149,8 @@ export interface Usage {
   month: string
   prospects_scraped: number
   hubspot_synced: number
+  intel_generated: number
+  sequences_generated: number
   created_at: string
   updated_at: string
 }

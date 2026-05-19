@@ -47,7 +47,8 @@ insert into public.industry_templates (name, slug, default_keywords, sort_order)
   ('HVAC / Home Services', 'hvac',         ARRAY['Full System Replacement','Duct Replacement','Generator Install','Whole-Home Repiping','Roof Replacement'], 4),
   ('Real Estate',          'real_estate',  ARRAY['Luxury Listings','Commercial Properties','Property Management','Investment Properties'], 5),
   ('Wellness / Chiro',     'wellness',     ARRAY['Spinal Decompression','Regenerative Therapy','IV Therapy','Weight Loss Programs','Hormone Therapy'], 6),
-  ('Other / Custom',       'custom',       ARRAY[]::text[], 7);
+  ('Restoration / Remediation', 'restoration', ARRAY['Water Damage Restoration','Fire Damage Restoration','Mold Remediation','Smoke Damage Restoration','Flood Restoration','Storm Damage Restoration','Disaster Restoration','Structural Drying','Contents Restoration','Biohazard Cleanup'], 8),
+  ('Other / Custom',       'custom',       ARRAY[]::text[], 9);
 
 -- ============================================================
 -- PROSPECT LISTS (one per qualification run)

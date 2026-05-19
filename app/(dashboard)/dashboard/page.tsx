@@ -5,6 +5,8 @@ import { FALLBACK_TEMPLATES } from '@/lib/templates'
 import DeleteListButton from './DeleteListButton'
 import HubSpotImportModal from '@/components/HubSpotImportModal'
 import HowItWorks from '@/components/HowItWorks'
+import HowEmailSequencingWorks from '@/components/HowEmailSequencingWorks'
+import HubSpotApolloFieldGuide from '@/components/HubSpotApolloFieldGuide'
 
 function StatusPill({ status }: { status: ProspectList['status'] }) {
   const map = {
@@ -88,6 +90,8 @@ export default async function DashboardPage() {
       </div>
 
       <HowItWorks />
+      <HowEmailSequencingWorks />
+      <HubSpotApolloFieldGuide />
 
       {!lists || lists.length === 0 ? (
         <div className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-gray-200 bg-white py-20 text-center">

@@ -75,24 +75,49 @@ const YES_NO_UNKNOWN: PropOption[] = [
   { label: 'No',      value: 'No',      displayOrder: 2 },
 ]
 
+const APOLLO_STATUS_OPTIONS: PropOption[] = [
+  { label: 'Not Enrolled', value: 'Not Enrolled', displayOrder: 0 },
+  { label: 'Enrolled',     value: 'Enrolled',     displayOrder: 1 },
+  { label: 'Replied',      value: 'Replied',      displayOrder: 2 },
+  { label: 'Bounced',      value: 'Bounced',      displayOrder: 3 },
+  { label: 'Completed',    value: 'Completed',    displayOrder: 4 },
+]
+
 // Shared property definitions — applied identically to both contacts and companies.
 // groupName is set per-object-type when building the final PropDef arrays.
 const SHARED_PROPS: Omit<PropDef, 'groupName'>[] = [
-  { name: 'outreach_hook',           label: 'Outreach Hook',           type: 'string',      fieldType: 'text'     },
-  { name: 'leadpulse_score',         label: 'LeadPulse Score',         type: 'string',      fieldType: 'text'     },
-  { name: 'leadpulse_list_name',     label: 'LeadPulse List Name',     type: 'string',      fieldType: 'text'     },
-  { name: 'leadpulse_filter_summary',label: 'LeadPulse Filter Summary',type: 'string',      fieldType: 'textarea' },
-  { name: 'practice_platform',       label: 'Practice Platform',       type: 'string',      fieldType: 'text'     },
-  { name: 'crm_platform',            label: 'CRM Platform',            type: 'string',      fieldType: 'text'     },
-  { name: 'has_chatbot',             label: 'Has Chatbot',             type: 'enumeration', fieldType: 'select', options: YES_NO_UNKNOWN },
-  { name: 'has_contact_form',        label: 'Has Contact Form',        type: 'enumeration', fieldType: 'select', options: YES_NO_UNKNOWN },
-  { name: 'has_online_booking',      label: 'Has Online Booking',      type: 'enumeration', fieldType: 'select', options: YES_NO_UNKNOWN },
-  { name: 'services_detected',       label: 'Services Detected',       type: 'string',      fieldType: 'text'     },
-  { name: 'location_count',          label: 'Location Count',          type: 'number',      fieldType: 'number'   },
-  { name: 'leadpulse_intel',         label: 'LeadPulse Intel',         type: 'string',      fieldType: 'textarea' },
+  { name: 'outreach_hook',            label: 'Outreach Hook',            type: 'string',      fieldType: 'text'     },
+  { name: 'leadpulse_score',          label: 'LeadPulse Score',          type: 'string',      fieldType: 'text'     },
+  { name: 'leadpulse_list_name',      label: 'LeadPulse List Name',      type: 'string',      fieldType: 'text'     },
+  { name: 'leadpulse_filter_summary', label: 'LeadPulse Filter Summary', type: 'string',      fieldType: 'textarea' },
+  { name: 'practice_platform',        label: 'Practice Platform',        type: 'string',      fieldType: 'text'     },
+  { name: 'crm_platform',             label: 'CRM Platform',             type: 'string',      fieldType: 'text'     },
+  { name: 'has_chatbot',              label: 'Has Chatbot',              type: 'enumeration', fieldType: 'select', options: YES_NO_UNKNOWN },
+  { name: 'has_contact_form',         label: 'Has Contact Form',         type: 'enumeration', fieldType: 'select', options: YES_NO_UNKNOWN },
+  { name: 'has_online_booking',       label: 'Has Online Booking',       type: 'enumeration', fieldType: 'select', options: YES_NO_UNKNOWN },
+  { name: 'services_detected',        label: 'Services Detected',        type: 'string',      fieldType: 'text'     },
+  { name: 'location_count',           label: 'Location Count',           type: 'number',      fieldType: 'number'   },
+  { name: 'leadpulse_intel',          label: 'LeadPulse Intel',          type: 'string',      fieldType: 'textarea' },
+  // V2 — Email Sequence
+  { name: 'outreach_email_1_subject', label: 'Email 1 Subject',          type: 'string',      fieldType: 'text'     },
+  { name: 'outreach_email_1_body',    label: 'Email 1 Body',             type: 'string',      fieldType: 'textarea' },
+  { name: 'outreach_email_2_subject', label: 'Email 2 Subject',          type: 'string',      fieldType: 'text'     },
+  { name: 'outreach_email_2_body',    label: 'Email 2 Body',             type: 'string',      fieldType: 'textarea' },
+  { name: 'outreach_email_3_subject', label: 'Email 3 Subject',          type: 'string',      fieldType: 'text'     },
+  { name: 'outreach_email_3_body',    label: 'Email 3 Body',             type: 'string',      fieldType: 'textarea' },
+  { name: 'apollo_sequence_status',   label: 'Apollo Sequence Status',   type: 'enumeration', fieldType: 'select', options: APOLLO_STATUS_OPTIONS },
 ]
 
-const CONTACT_CUSTOM_PROPS: PropDef[] = SHARED_PROPS.map((p) => ({ ...p, groupName: 'contactinformation' }))
+// Contact-only properties — not synced to company records
+const CONTACT_ONLY_PROPS: Omit<PropDef, 'groupName'>[] = [
+  { name: 'pain_indicators',       label: 'Pain Indicators',       type: 'string', fieldType: 'textarea' },
+  { name: 'conversation_starters', label: 'Conversation Starters', type: 'string', fieldType: 'textarea' },
+]
+
+const CONTACT_CUSTOM_PROPS: PropDef[] = [
+  ...SHARED_PROPS.map((p) => ({ ...p, groupName: 'contactinformation' })),
+  ...CONTACT_ONLY_PROPS.map((p) => ({ ...p, groupName: 'contactinformation' })),
+]
 const COMPANY_CUSTOM_PROPS: PropDef[] = SHARED_PROPS.map((p) => ({ ...p, groupName: 'companyinformation' }))
 
 // ── ensureCustomProperties ─────────────────────────────────────────────────────

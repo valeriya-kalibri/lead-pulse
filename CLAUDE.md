@@ -731,13 +731,29 @@ Same 200ms delay between requests as push sync.
 
 ---
 
-## V2 Roadmap (not yet built)
+## V2 Features (built 2026-05-19)
 
-- **Headless browser scraping** — Playwright for SPA/React sites (EMPTY_PAGE errors)
+### Email Sequencing
+- API route: `app/api/prospects/[id]/sequence/route.ts` — POST generates a 3-email sequence using Claude from the prospect's Intel Card data. Returns `{ outreach_email_subject_1, outreach_email_body_1, ..._2, ..._3 }`. Requires intel to exist + score hot/warm. Idempotent — returns cached if already generated (unless `?refresh=1`).
+- Stored in `prospects` as 6 columns: `outreach_email_subject_1/2/3`, `outreach_email_body_1/2/3` + `sequence_generated_at`
+- Apollo campaign tracking: `apollo_sequence_status` column — values: `not_enrolled | enrolled | replied | bounced | completed`. Updated via PATCH `/api/prospects/[id]` with `{ apollo_sequence_status }`.
+- UI: `IntelCard.tsx` — shows "Generate Email Sequence" button after Intel Card is generated. Displays 3 collapsible email cards with subject + body + copy buttons. Apollo status selector shown below emails.
+- HubSpot sync: 7 new custom properties — `outreach_email_1_subject`, `outreach_email_1_body`, `outreach_email_2_subject`, `outreach_email_2_body`, `outreach_email_3_subject`, `outreach_email_3_body`, `apollo_sequence_status`. Auto-created by `ensureCustomProperties()` in `lib/hubspot.ts`.
+- CSV export: includes all 6 email fields + `apollo_sequence_status` — always exported, blank if sequence not generated.
+- DB migration: `docs/migrations/011_v2_email_sequencing.sql` — run this on existing databases. `docs/leadpulse_supabase_schema_V2.sql` is the complete V2 schema.
+
+### Playwright Scraping (EMPTY_PAGE fallback)
+- `lib/scraper/playwrightFetch.ts` — headless Chromium fetch using `playwright-core` + `@sparticuz/chromium-min`. Returns rendered HTML or null on failure.
+- `lib/scraper/index.ts` — exports `scrapeHtml(html, keywords, criteria)` — runs detection pipeline on pre-fetched HTML without re-fetching. `scrapeUrl` calls this internally.
+- `lib/scraper/processJob.ts` — after EMPTY_PAGE error, retries with `playwrightFetch`, then runs `scrapeHtml` on the result. Sets `scrape_source: 'playwright'` on success. Tracks `playwright_fallback_count` in `error_summary`.
+- Playwright is never called on first attempt — only as fallback for confirmed EMPTY_PAGE sites.
+- Local dev: uses system Chromium installed via `npx playwright install chromium`. Vercel: uses `@sparticuz/chromium-min` binary fetched from GitHub releases.
+
+## V2 Remaining Roadmap
+
 - **Pain signal detection** — review sentiment, job listings, social posting frequency
 - **Billing & subscriptions** — Stripe integration
 - **Multi-tenant SaaS** — public product with user registration and plan enforcement
-- **Outreach hook export** — as HubSpot sequence trigger
 - **Franchisor-level features** — aggregate scoring across franchise groups
 
 ---

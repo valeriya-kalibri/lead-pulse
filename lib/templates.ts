@@ -66,10 +66,21 @@ export const FALLBACK_TEMPLATES: Omit<IndustryTemplate, 'created_at'>[] = [
     ],
   },
   {
+    id: 'restoration',
+    name: 'Restoration / Remediation',
+    slug: 'restoration',
+    sort_order: 8,
+    default_keywords: [
+      'Water Damage Restoration', 'Fire Damage Restoration', 'Mold Remediation',
+      'Smoke Damage Restoration', 'Flood Restoration', 'Storm Damage Restoration',
+      'Disaster Restoration', 'Structural Drying', 'Contents Restoration', 'Biohazard Cleanup',
+    ],
+  },
+  {
     id: 'custom',
     name: 'Other / Custom',
     slug: 'custom',
-    sort_order: 7,
+    sort_order: 9,
     default_keywords: [],
   },
 ]

@@ -1,4 +1,5 @@
-import { scrapeUrl, sleep } from '@/lib/scraper'
+import { scrapeUrl, scrapeHtml, sleep } from '@/lib/scraper'
+import { playwrightFetch } from '@/lib/scraper/playwrightFetch'
 import { createServiceClient } from '@/lib/supabase/server'
 import type { ErrorSummary, ErrorType } from '@/types'
 
@@ -30,19 +31,36 @@ export async function processJob(
   let warm = 0
   let cold = 0
   let totalMs = 0
+  let playwrightFallbackCount = 0
   const errorTypeCounts: Partial<Record<ErrorType, number>> = {}
 
   for (const prospect of pendingProspects) {
     await db.from('prospects').update({ scrape_status: 'processing' }).eq('id', prospect.id)
 
     const t0 = Date.now()
-    const result = await scrapeUrl(prospect.website_url, keywords, criteria)
+    let result = await scrapeUrl(prospect.website_url, keywords, criteria)
+    let usedPlaywright = false
+
+    // Playwright fallback for SPA/React sites that return an empty page shell
+    if (!result.success && result.errorType === 'EMPTY_PAGE') {
+      const html = await playwrightFetch(prospect.website_url)
+      if (html) {
+        result = scrapeHtml(html, keywords, criteria)
+        usedPlaywright = true
+        playwrightFallbackCount++
+      }
+    }
+
     totalMs += Date.now() - t0
 
     if (result.success && result.data) {
+      const dataToWrite = {
+        ...result.data,
+        ...(usedPlaywright && { scrape_source: 'playwright' }),
+      }
       const { error: updateErr } = await db
         .from('prospects')
-        .update({ ...result.data })
+        .update(dataToWrite)
         .eq('id', prospect.id)
       if (updateErr) {
         console.error(`[scrape] DB update failed for ${prospect.website_url}:`, updateErr.message)
@@ -80,12 +98,13 @@ export async function processJob(
     await sleep(500)
   }
 
-  const errorSummary: ErrorSummary = {
+  const errorSummary: ErrorSummary & { playwright_fallback_count?: number } = {
     succeeded: processed - failed,
     failed,
     skipped: skippedCount ?? 0,
     by_error_type: errorTypeCounts,
     avg_scrape_ms: processed > 0 ? Math.round(totalMs / processed) : null,
+    ...(playwrightFallbackCount > 0 && { playwright_fallback_count: playwrightFallbackCount }),
   }
 
   await db

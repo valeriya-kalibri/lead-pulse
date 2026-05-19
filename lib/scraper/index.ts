@@ -55,6 +55,86 @@ function categorizeError(err: unknown, status?: number): ErrorType {
   return 'UNKNOWN'
 }
 
+/**
+ * Run the full detection + scoring pipeline on already-fetched HTML.
+ * Returns a ScrapeResult. Does NOT check for empty pages — caller is responsible.
+ */
+export function scrapeHtml(
+  html: string,
+  keywords: string[],
+  criteria: string[] = ALL_CRITERIA
+): ScrapeResult {
+  const $full = cheerio.load(html)
+  const businessName =
+    $full('meta[property="og:site_name"]').attr('content') ||
+    $full('title').text().split('|')[0].split('–')[0].split('-')[0].trim() ||
+    null
+
+  const chatbot = criteria.includes('chatbot')
+    ? detectChatbot(html)
+    : { hasChat: 'unknown' as const, platform: null }
+
+  const services = criteria.includes('services')
+    ? detectServices(html, keywords)
+    : { services: [] }
+
+  const crmEmr = criteria.includes('crm_emr')
+    ? detectCrmEmr(html)
+    : { crmEmrPlatform: null }
+
+  const crm = criteria.includes('crm')
+    ? detectCRM(html)
+    : { crmPlatform: null }
+
+  const locations = criteria.includes('locations')
+    ? detectLocations(html)
+    : { locationCount: null as number | null, isMultiLocation: null as boolean | null }
+
+  const analytics = criteria.includes('analytics')
+    ? detectAnalytics(html)
+    : { analyticsPlatform: null }
+
+  const needsBooking = criteria.includes('online_booking') || criteria.includes('contact_form')
+  const booking = needsBooking ? detectBooking(html) : { hasOnlineBooking: 'unknown' as const }
+
+  const contactForm = criteria.includes('contact_form')
+    ? detectContactForm(html)
+    : { hasContactForm: 'unknown' as const }
+
+  const scored = scoreProspect({
+    hasChat: chatbot.hasChat,
+    chatPlatform: chatbot.platform,
+    hasOnlineBooking: booking.hasOnlineBooking,
+    hasContactForm: contactForm.hasContactForm,
+    highTicketServices: services.services,
+    criteria,
+  })
+
+  return {
+    success: true,
+    data: {
+      business_name: businessName,
+      has_chatbot: criteria.includes('chatbot') ? chatbot.hasChat : 'unknown',
+      chatbot_platform: chatbot.platform,
+      has_contact_form: criteria.includes('contact_form') ? contactForm.hasContactForm : 'unknown',
+      has_online_booking: criteria.includes('online_booking') ? booking.hasOnlineBooking : 'unknown',
+      ...(criteria.includes('crm_emr') && { crm_emr_platform: crmEmr.crmEmrPlatform }),
+      ...(criteria.includes('crm') && { crm_platform: crm.crmPlatform }),
+      ...(criteria.includes('services') && { high_ticket_services: services.services }),
+      ...(criteria.includes('locations') && {
+        location_count: locations.locationCount,
+        is_multi_location: locations.isMultiLocation,
+      }),
+      ...(criteria.includes('analytics') && { analytics_platform: analytics.analyticsPlatform }),
+      score: scored.score,
+      score_reason: scored.score_reason,
+      outreach_hook: scored.outreach_hook,
+      scrape_status: 'complete',
+      scraped_at: new Date().toISOString(),
+    },
+  }
+}
+
 export async function scrapeUrl(
   url: string,
   keywords: string[],
@@ -100,84 +180,7 @@ export async function scrapeUrl(
       }
     }
 
-    // Restore full DOM for detectors (reload with original HTML)
-    const $full = cheerio.load(html)
-    const businessName =
-      $full('meta[property="og:site_name"]').attr('content') ||
-      $full('title').text().split('|')[0].split('–')[0].split('-')[0].trim() ||
-      null
-
-    const chatbot = criteria.includes('chatbot')
-      ? detectChatbot(html)
-      : { hasChat: 'unknown' as const, platform: null }
-
-    const services = criteria.includes('services')
-      ? detectServices(html, keywords)
-      : { services: [] }
-
-    const crmEmr = criteria.includes('crm_emr')
-      ? detectCrmEmr(html)
-      : { crmEmrPlatform: null }
-
-    const crm = criteria.includes('crm')
-      ? detectCRM(html)
-      : { crmPlatform: null }
-
-    const locations = criteria.includes('locations')
-      ? detectLocations(html)
-      : { locationCount: null as number | null, isMultiLocation: null as boolean | null }
-
-    const analytics = criteria.includes('analytics')
-      ? detectAnalytics(html)
-      : { analyticsPlatform: null }
-
-    const needsBooking = criteria.includes('online_booking') || criteria.includes('contact_form')
-    const booking = needsBooking ? detectBooking(html) : { hasOnlineBooking: 'unknown' as const }
-
-    const contactForm = criteria.includes('contact_form')
-      ? detectContactForm(html)
-      : { hasContactForm: 'unknown' as const }
-
-    const scored = scoreProspect({
-      hasChat: chatbot.hasChat,
-      chatPlatform: chatbot.platform,
-      hasOnlineBooking: booking.hasOnlineBooking,
-      hasContactForm: contactForm.hasContactForm,
-      highTicketServices: services.services,
-      criteria,
-    })
-
-    return {
-      success: true,
-      data: {
-        business_name: businessName,
-        has_chatbot: criteria.includes('chatbot') ? chatbot.hasChat : 'unknown',
-        chatbot_platform: chatbot.platform,
-        has_contact_form: criteria.includes('contact_form') ? contactForm.hasContactForm : 'unknown',
-        has_online_booking: criteria.includes('online_booking') ? booking.hasOnlineBooking : 'unknown',
-        ...(criteria.includes('crm_emr') && {
-          crm_emr_platform: crmEmr.crmEmrPlatform,
-        }),
-        ...(criteria.includes('crm') && {
-          crm_platform: crm.crmPlatform,
-        }),
-        ...(criteria.includes('services') && {
-          high_ticket_services: services.services,
-        }),
-        ...(criteria.includes('locations') && {
-          location_count: locations.locationCount,
-          is_multi_location: locations.isMultiLocation,
-        }),
-        ...(criteria.includes('analytics') && {
-          analytics_platform: analytics.analyticsPlatform,
-        }),
-        score: scored.score,
-        score_reason: scored.score_reason,
-        outreach_hook: scored.outreach_hook,
-        scrape_status: 'complete',
-        scraped_at: new Date().toISOString(),
-      },
-    }
+    return scrapeHtml(html, keywords, criteria)
   } catch (err) {
     const error = err instanceof Error ? err.message : 'Unknown error'
     return { success: false, error, errorType: categorizeError(err) }
