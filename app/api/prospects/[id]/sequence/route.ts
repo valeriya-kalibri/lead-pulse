@@ -91,6 +91,7 @@ Email writing rules:
 - Plain text, conversational, sounds like a real human (not a marketing tool)
 - No bullet points in email bodies
 - No "I hope this finds you well" or generic openers
+- Do NOT use any person's name anywhere in the subject or body — no owner names, no contact names, nothing. Names will be added by the sender in Apollo.
 - Each email takes a different angle — never repeat the same point
 - Short subject lines — 4-7 words, no punctuation
 - Email 1: Lead with the outreach hook, expand into 3-4 short paragraphs, end with one soft question
