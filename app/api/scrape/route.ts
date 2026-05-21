@@ -47,6 +47,8 @@ export async function POST(req: NextRequest) {
   const industryTemplateId = formData.get('industry_template_id') as string
   const keywordsRaw = formData.get('keywords') as string
   const criteriaRaw = formData.get('criteria') as string
+  const offerTypeRaw = formData.get('offer_type') as string | null
+  const offerType = offerTypeRaw === 'business_analytics' ? 'business_analytics' : 'lead_capture'
   const csvFile = formData.get('csv') as File | null
 
   if (!name || !csvFile) {
@@ -110,6 +112,7 @@ export async function POST(req: NextRequest) {
         : null,
       service_keywords: keywords,
       selected_criteria: criteria,
+      offer_type: offerType,
       status: 'processing',
       total_prospects: prospectInserts.length,
     })

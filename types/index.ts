@@ -3,6 +3,7 @@ export type Role = 'admin' | 'user'
 export type YesNoUnknown = 'yes' | 'no' | 'unknown'
 export type ApolloStatus = 'not_enrolled' | 'enrolled' | 'replied' | 'bounced' | 'completed'
 export type ScrapeSource = 'node_fetch' | 'playwright'
+export type OfferType = 'lead_capture' | 'business_analytics'
 export type ErrorType =
   | 'TIMEOUT'
   | 'BLOCKED'
@@ -76,6 +77,7 @@ export interface ProspectList {
   status: ListStatus
   selected_criteria: string[] | null
   filter_summary: string | null
+  offer_type: OfferType
   created_at: string
   updated_at: string
 }

@@ -1,6 +1,7 @@
 # LeadPulse — Claude Project Context
 > Built by Kalibri Studios — Valeriya Paine | KalibriStudios.AI
 > This file gives Claude full context on the LeadPulse codebase. Read this before writing any code.
+> **Also read:** `CLAUDE_V2_APPENDIX.md` (email sequences, Apollo, Playwright) and `CLAUDE_OFFER_TYPES.md` (multi-offer system — lead capture vs business analytics).
 
 ---
 

@@ -4,6 +4,8 @@ import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import HubSpotPullModal from '@/components/HubSpotPullModal'
 import StartScrapingModal from '@/components/StartScrapingModal'
+import { OFFERS, otherOffer } from '@/lib/offers'
+import type { OfferType } from '@/types'
 
 interface Props {
   listId: string
@@ -16,15 +18,34 @@ interface Props {
   isJobActive: boolean
   listKeywords: string[]
   listCriteria: string[]
+  offerType: OfferType
+  hasScrapedProspects: boolean
 }
 
-export default function ListActions({ listId, listName, userId, prospectIds, isPro, hasHubspotKey, hasPendingProspects, isJobActive, listKeywords, listCriteria }: Props) {
+export default function ListActions({
+  listId,
+  listName,
+  userId,
+  prospectIds,
+  isPro,
+  hasHubspotKey,
+  hasPendingProspects,
+  isJobActive,
+  listKeywords,
+  listCriteria,
+  offerType,
+  hasScrapedProspects,
+}: Props) {
   const router = useRouter()
   const [deleting, setDeleting] = useState(false)
   const [scraping, setScraping] = useState(false)
   const [showScrapingModal, setShowScrapingModal] = useState(false)
   const [syncing, setSyncing] = useState(false)
   const [syncResult, setSyncResult] = useState<{ synced: number; failed: number; errors: Array<{ prospectId: string; error: string }> } | null>(null)
+  const [cloning, setCloning] = useState(false)
+
+  const targetOfferType = otherOffer(offerType)
+  const targetOfferLabel = OFFERS[targetOfferType].label
 
   async function handleStartScraping(keywords: string[], criteria: string[]) {
     setScraping(true)
@@ -83,6 +104,22 @@ export default function ListActions({ listId, listName, userId, prospectIds, isP
     }
   }
 
+  async function handleClone() {
+    if (!confirm(`Clone this list as "${listName} — ${targetOfferLabel}"?\n\nAll scraped prospect data will be copied and re-scored for the ${targetOfferLabel} offer. Intel cards and email sequences will be cleared — generate them fresh from the new list.`)) return
+    setCloning(true)
+    try {
+      const res = await fetch(`/api/lists/${listId}/clone`, { method: 'POST' })
+      const json = await res.json()
+      if (!res.ok) {
+        alert(json.error ?? 'Clone failed.')
+        return
+      }
+      router.push(`/lists/${json.list_id}`)
+    } finally {
+      setCloning(false)
+    }
+  }
+
   const canSync = isPro && hasHubspotKey
   const syncDisabledReason = !isPro
     ? 'Pro plan required'
@@ -102,7 +139,7 @@ export default function ListActions({ listId, listName, userId, prospectIds, isP
         confirming={scraping}
       />
 
-    <div className="flex items-center gap-2">
+    <div className="flex items-center gap-2 flex-wrap">
       {/* Start Scraping — shown for HubSpot-imported lists with unscraped prospects */}
       {hasPendingProspects && !isJobActive && (
         <button
@@ -114,6 +151,20 @@ export default function ListActions({ listId, listName, userId, prospectIds, isP
             <path strokeLinecap="round" strokeLinejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 010 1.972l-11.54 6.347a1.125 1.125 0 01-1.667-.986V5.653z" />
           </svg>
           Start Scraping
+        </button>
+      )}
+
+      {/* Clone for New Offer — shown when list has scraped prospects */}
+      {hasScrapedProspects && (
+        <button
+          onClick={handleClone}
+          disabled={cloning}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-[#AABFFF] bg-[#AABFFF]/10 px-3 py-2 text-sm font-medium text-[#2E3A59] hover:bg-[#AABFFF]/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 01-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 011.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 00-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 01-1.125-1.125v-9.25m12 6.625v-1.875a3.375 3.375 0 00-3.375-3.375h-1.5a1.125 1.125 0 01-1.125-1.125v-1.5a3.375 3.375 0 00-3.375-3.375H9.75" />
+          </svg>
+          {cloning ? 'Cloning…' : `Clone as ${targetOfferLabel}`}
         </button>
       )}
 

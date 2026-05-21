@@ -1,13 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
+import { OFFERS } from '@/lib/offers'
+import type { OfferType } from '@/types'
 
 interface Props {
   params: Promise<{ id: string }>
 }
-
-const SYSTEM_PROMPT =
-  'You are a cold outreach copywriter. Write personalized cold email sequences for sales reps. Each email must reference specific facts about the prospect — never use generic placeholders. Return only valid JSON, no preamble, no markdown.'
 
 export async function POST(req: NextRequest, { params }: Props) {
   const { id } = await params
@@ -39,6 +38,15 @@ export async function POST(req: NextRequest, { params }: Props) {
     return NextResponse.json({ error: 'Generate an Intel Card first' }, { status: 400 })
   }
 
+  // Fetch list to determine offer type — drives system prompt and agency description
+  const { data: list } = await db
+    .from('prospect_lists')
+    .select('offer_type')
+    .eq('id', prospect.list_id)
+    .single()
+  const offerType = ((list?.offer_type as OfferType) ?? 'lead_capture')
+  const offerConfig = OFFERS[offerType]
+
   const forceRefresh = new URL(req.url).searchParams.get('refresh') === '1'
   if (prospect.sequence_generated_at && !forceRefresh) {
     return NextResponse.json({
@@ -62,7 +70,9 @@ export async function POST(req: NextRequest, { params }: Props) {
 
   const industry = (prospect.prospect_lists as { industry_name: string | null } | null)?.industry_name ?? 'Unknown'
 
-  const userMessage = `Write a 3-step cold email sequence for this prospect.
+  const userMessage = `${offerConfig.sequenceAgencyDescription}
+
+Write a 3-step cold email sequence for this prospect.
 
 BUSINESS: ${prospect.business_name || 'Unknown'}
 WEBSITE: ${prospect.website_url}
@@ -123,7 +133,7 @@ Return only valid JSON:
     const msg = await anthropic.messages.create({
       model: 'claude-sonnet-4-6',
       max_tokens: 2000,
-      system: SYSTEM_PROMPT,
+      system: offerConfig.sequenceSystemPrompt,
       messages: [{ role: 'user', content: userMessage }],
     })
 

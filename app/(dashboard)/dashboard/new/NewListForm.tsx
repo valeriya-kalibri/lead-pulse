@@ -2,8 +2,9 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import type { IndustryTemplate } from '@/types'
+import type { IndustryTemplate, OfferType } from '@/types'
 import { CRITERIA_LIST, ALL_CRITERIA } from '@/lib/criteria'
+import { OFFER_LIST, OFFERS } from '@/lib/offers'
 
 interface Props {
   templates: IndustryTemplate[]
@@ -39,6 +40,7 @@ function StepCard({
 export default function NewListForm({ templates }: Props) {
   const router = useRouter()
   const [name, setName] = useState('')
+  const [offerType, setOfferType] = useState<OfferType>('lead_capture')
   const [selectedTemplate, setSelectedTemplate] = useState<IndustryTemplate | null>(null)
   const [keywords, setKeywords] = useState<string[]>([])
   const [keywordInput, setKeywordInput] = useState('')
@@ -47,6 +49,12 @@ export default function NewListForm({ templates }: Props) {
   const [dragOver, setDragOver] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  function selectOffer(type: OfferType) {
+    setOfferType(type)
+    // Apply the offer's default criteria — user can still edit
+    setCriteria([...OFFERS[type].defaultCriteria])
+  }
 
   function selectTemplate(t: IndustryTemplate) {
     setSelectedTemplate(t)
@@ -93,6 +101,7 @@ export default function NewListForm({ templates }: Props) {
     formData.append('industry_template_id', selectedTemplate.id)
     formData.append('keywords', JSON.stringify(keywords))
     formData.append('criteria', JSON.stringify(criteria))
+    formData.append('offer_type', offerType)
     formData.append('csv', file)
 
     const res = await fetch('/api/scrape', { method: 'POST', body: formData })
@@ -121,8 +130,40 @@ export default function NewListForm({ templates }: Props) {
         />
       </StepCard>
 
-      {/* Step 2 — Industry template */}
-      <StepCard step={2} title="Select an industry" subtitle="Loads a curated keyword set for that vertical.">
+      {/* Step 2 — Offer type */}
+      <StepCard
+        step={2}
+        title="Choose your offer"
+        subtitle="Controls scoring, intel, and email sequence angle for every prospect in this list."
+      >
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          {OFFER_LIST.map((offer) => {
+            const selected = offerType === offer.id
+            return (
+              <button
+                key={offer.id}
+                type="button"
+                onClick={() => selectOffer(offer.id)}
+                className={`text-left rounded-xl border px-4 py-3.5 transition-all ${
+                  selected
+                    ? 'border-[#2E3A59] bg-[#2E3A59] shadow-sm'
+                    : 'border-gray-200 bg-white hover:border-[#AABFFF]'
+                }`}
+              >
+                <p className={`text-sm font-semibold ${selected ? 'text-white' : 'text-[#2E3A59]'}`}>
+                  {offer.label}
+                </p>
+                <p className={`text-xs mt-1 leading-relaxed ${selected ? 'text-white/75' : 'text-gray-400'}`}>
+                  {offer.description}
+                </p>
+              </button>
+            )
+          })}
+        </div>
+      </StepCard>
+
+      {/* Step 3 — Industry template */}
+      <StepCard step={3} title="Select an industry" subtitle="Loads a curated keyword set for that vertical.">
         <div className="flex flex-wrap gap-2">
           {templates.map((t) => (
             <button
@@ -141,9 +182,9 @@ export default function NewListForm({ templates }: Props) {
         </div>
       </StepCard>
 
-      {/* Step 3 — Keywords */}
+      {/* Step 4 — Keywords */}
       <StepCard
-        step={3}
+        step={4}
         title="Service keywords"
         subtitle="Terms that signal this prospect needs what you sell."
       >
@@ -186,8 +227,12 @@ export default function NewListForm({ templates }: Props) {
         </div>
       </StepCard>
 
-      {/* Step 4 — Criteria */}
-      <StepCard step={4} title="Qualification criteria" subtitle="Only checked items will be scraped, scored, and shown as columns.">
+      {/* Step 5 — Criteria */}
+      <StepCard
+        step={5}
+        title="Qualification criteria"
+        subtitle="Pre-filled for your offer. Only checked items are scraped, scored, and shown as columns."
+      >
         <div className="flex gap-3 text-xs mb-3">
           <button
             type="button"
@@ -204,11 +249,19 @@ export default function NewListForm({ templates }: Props) {
           >
             Clear all
           </button>
+          <button
+            type="button"
+            onClick={() => setCriteria([...OFFERS[offerType].defaultCriteria])}
+            className="text-[#AABFFF] hover:underline"
+          >
+            Reset to offer defaults
+          </button>
           <span className="ml-auto text-gray-400">{criteria.length} of {CRITERIA_LIST.length} selected</span>
         </div>
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
           {CRITERIA_LIST.map((c) => {
             const checked = criteria.includes(c.id)
+            const isDefault = OFFERS[offerType].defaultCriteria.includes(c.id)
             return (
               <label
                 key={c.id}
@@ -218,6 +271,12 @@ export default function NewListForm({ templates }: Props) {
                     : 'border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50'
                 }`}
               >
+                <input
+                  type="checkbox"
+                  className="sr-only"
+                  checked={checked}
+                  onChange={() => toggleCriterion(c.id)}
+                />
                 <span
                   className={`flex-shrink-0 mt-0.5 w-4 h-4 rounded border flex items-center justify-center transition-colors ${
                     checked ? 'bg-[#2E3A59] border-[#2E3A59]' : 'border-gray-300 bg-white'
@@ -230,7 +289,14 @@ export default function NewListForm({ templates }: Props) {
                   )}
                 </span>
                 <div className="min-w-0">
-                  <p className={`text-xs font-semibold ${checked ? 'text-[#2E3A59]' : 'text-gray-600'}`}>{c.label}</p>
+                  <div className="flex items-center gap-1.5">
+                    <p className={`text-xs font-semibold ${checked ? 'text-[#2E3A59]' : 'text-gray-600'}`}>{c.label}</p>
+                    {isDefault && (
+                      <span className="text-[10px] font-medium text-[#AABFFF] bg-[#AABFFF]/15 px-1.5 py-0.5 rounded-full leading-none">
+                        default
+                      </span>
+                    )}
+                  </div>
                   <p className="text-xs text-gray-400 mt-0.5 leading-relaxed">{c.description}</p>
                 </div>
               </label>
@@ -239,8 +305,8 @@ export default function NewListForm({ templates }: Props) {
         </div>
       </StepCard>
 
-      {/* Step 5 — CSV upload */}
-      <StepCard step={5} title="Upload your CSV" subtitle="One website URL per row. Business name and other fields are optional.">
+      {/* Step 6 — CSV upload */}
+      <StepCard step={6} title="Upload your CSV" subtitle="One website URL per row. Business name and other fields are optional.">
         <div
           onDrop={handleDrop}
           onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}

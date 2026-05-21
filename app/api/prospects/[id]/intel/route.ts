@@ -2,14 +2,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import * as cheerio from 'cheerio'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
-import type { IntelData } from '@/types'
+import { OFFERS } from '@/lib/offers'
+import type { IntelData, OfferType } from '@/types'
 
 interface Props {
   params: Promise<{ id: string }>
 }
-
-const SYSTEM_PROMPT =
-  'You are a sales intelligence analyst. Based on the business data provided, generate a concise prospect intelligence briefing for a sales rep who is about to make first contact. The outreach hook must be specific to this exact prospect — never generic. Be actionable and grounded only in what the data shows. Return only valid JSON, no preamble, no markdown.'
 
 async function fetchText(url: string, maxChars = 3000): Promise<string> {
   try {
@@ -76,6 +74,15 @@ export async function POST(req: NextRequest, { params }: Props) {
   if (prospect.score === 'cold') {
     return NextResponse.json({ error: 'Intel not available for Cold prospects' }, { status: 400 })
   }
+
+  // Fetch list to determine offer type — drives the intel system prompt
+  const { data: list } = await db
+    .from('prospect_lists')
+    .select('offer_type')
+    .eq('id', prospect.list_id)
+    .single()
+  const offerType = ((list?.offer_type as OfferType) ?? 'lead_capture')
+  const offerConfig = OFFERS[offerType]
 
   // Return cached intel unless force-refresh requested
   const forceRefresh = new URL(req.url).searchParams.get('refresh') === '1'
@@ -177,7 +184,7 @@ Return a JSON object with exactly these fields:
     const msg = await anthropic.messages.create({
       model: 'claude-sonnet-4-6',
       max_tokens: 1200,
-      system: SYSTEM_PROMPT,
+      system: offerConfig.intelSystemPrompt,
       messages: [{ role: 'user', content: userMessage }],
     })
 

@@ -9,7 +9,7 @@ import { detectBooking } from './detectBooking'
 import { detectAnalytics } from './detectAnalytics'
 import { scoreProspect } from './score'
 import { ALL_CRITERIA } from '@/lib/criteria'
-import type { Prospect, ErrorType } from '@/types'
+import type { Prospect, ErrorType, OfferType } from '@/types'
 
 export interface ScrapeResult {
   success: boolean
@@ -62,7 +62,8 @@ function categorizeError(err: unknown, status?: number): ErrorType {
 export function scrapeHtml(
   html: string,
   keywords: string[],
-  criteria: string[] = ALL_CRITERIA
+  criteria: string[] = ALL_CRITERIA,
+  offerType: OfferType = 'lead_capture'
 ): ScrapeResult {
   const $full = cheerio.load(html)
   const businessName =
@@ -107,7 +108,12 @@ export function scrapeHtml(
     hasOnlineBooking: booking.hasOnlineBooking,
     hasContactForm: contactForm.hasContactForm,
     highTicketServices: services.services,
+    analyticsPlatform: analytics.analyticsPlatform,
+    locationCount: locations.locationCount,
+    isMultiLocation: locations.isMultiLocation,
+    crmEmrPlatform: crmEmr.crmEmrPlatform,
     criteria,
+    offerType,
   })
 
   return {
@@ -138,7 +144,8 @@ export function scrapeHtml(
 export async function scrapeUrl(
   url: string,
   keywords: string[],
-  criteria: string[] = ALL_CRITERIA
+  criteria: string[] = ALL_CRITERIA,
+  offerType: OfferType = 'lead_capture'
 ): Promise<ScrapeResult> {
   try {
     const controller = new AbortController()
@@ -180,7 +187,7 @@ export async function scrapeUrl(
       }
     }
 
-    return scrapeHtml(html, keywords, criteria)
+    return scrapeHtml(html, keywords, criteria, offerType)
   } catch (err) {
     const error = err instanceof Error ? err.message : 'Unknown error'
     return { success: false, error, errorType: categorizeError(err) }

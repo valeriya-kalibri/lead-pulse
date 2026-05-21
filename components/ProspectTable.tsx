@@ -141,6 +141,7 @@ export default function ProspectTable({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [syncing, setSyncing] = useState(false)
   const [syncToast, setSyncToast] = useState<SyncToast | null>(null)
+  const [removingId, setRemovingId] = useState<string | null>(null)
 
   // 5 fixed columns (Checkbox, Score, Intel/Hook, Business, URL) + 1 per active criterion
   const colCount = 5 + ALL_COL_CRITERIA.filter((c) => criteria.includes(c)).length
@@ -274,6 +275,25 @@ export default function ProspectTable({
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ [state.field]: state.value || null }),
     }).catch(console.error)
+  }
+
+  async function removeProspect(id: string) {
+    setRemovingId(id)
+    try {
+      const res = await fetch(`/api/prospects/${id}`, { method: 'DELETE' })
+      if (!res.ok) {
+        const { error } = await res.json().catch(() => ({ error: 'Unknown error' }))
+        alert(`Failed to remove: ${error}`)
+        return
+      }
+      setProspects((prev) => prev.filter((p) => p.id !== id))
+      setExpanded(null)
+      setSelectedIds((prev) => { const next = new Set(prev); next.delete(id); return next })
+    } catch {
+      alert('Failed to remove — check your network connection.')
+    } finally {
+      setRemovingId(null)
+    }
   }
 
   async function handleHubSpotSync() {
@@ -834,6 +854,21 @@ export default function ProspectTable({
                               <p className="text-gray-500">{p.scrape_error}</p>
                             </div>
                           )}
+                        </div>
+                        <div className="mt-4 pt-3 border-t border-gray-200 flex justify-end">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              if (confirm(`Remove ${p.business_name ?? p.website_url} from this list?`)) {
+                                removeProspect(p.id)
+                              }
+                            }}
+                            disabled={removingId === p.id}
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-white px-3 py-1.5 text-xs font-medium text-red-500 hover:bg-red-50 hover:border-red-300 disabled:opacity-50 transition-colors"
+                          >
+                            {removingId === p.id ? 'Removing…' : 'Remove from list'}
+                          </button>
                         </div>
                       </td>
                     </tr>

@@ -60,3 +60,35 @@ export async function PATCH(req: NextRequest, { params }: Props) {
 
   return NextResponse.json({ ok: true })
 }
+
+export async function DELETE(_req: NextRequest, { params }: Props) {
+  const { id } = await params
+
+  const supabaseAuth = await createClient()
+  const {
+    data: { user },
+  } = await supabaseAuth.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const db = createServiceClient()
+
+  const { data: prospect } = await db
+    .from('prospects')
+    .select('id, list_id, score')
+    .eq('id', id)
+    .eq('user_id', user.id)
+    .single()
+
+  if (!prospect) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+
+  const { error } = await db.from('prospects').delete().eq('id', id)
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  // Keep list counts in sync
+  await db.rpc('decrement_prospect_counts', {
+    p_list_id: prospect.list_id,
+    p_score: prospect.score,
+  })
+
+  return NextResponse.json({ ok: true })
+}

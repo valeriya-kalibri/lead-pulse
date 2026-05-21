@@ -1,7 +1,7 @@
 import { scrapeUrl, scrapeHtml, sleep } from '@/lib/scraper'
 import { playwrightFetch } from '@/lib/scraper/playwrightFetch'
 import { createServiceClient } from '@/lib/supabase/server'
-import type { ErrorSummary, ErrorType } from '@/types'
+import type { ErrorSummary, ErrorType, OfferType } from '@/types'
 
 export async function processJob(
   listId: string,
@@ -11,6 +11,14 @@ export async function processJob(
   criteria: string[],
   db: ReturnType<typeof createServiceClient>
 ) {
+  // Fetch offer type from the list — drives scoring logic
+  const { data: listRecord } = await db
+    .from('prospect_lists')
+    .select('offer_type')
+    .eq('id', listId)
+    .single()
+  const offerType: OfferType = (listRecord?.offer_type as OfferType) ?? 'lead_capture'
+
   const { data: pendingProspects } = await db
     .from('prospects')
     .select('id, website_url')
@@ -38,14 +46,14 @@ export async function processJob(
     await db.from('prospects').update({ scrape_status: 'processing' }).eq('id', prospect.id)
 
     const t0 = Date.now()
-    let result = await scrapeUrl(prospect.website_url, keywords, criteria)
+    let result = await scrapeUrl(prospect.website_url, keywords, criteria, offerType)
     let usedPlaywright = false
 
     // Playwright fallback for SPA/React sites that return an empty page shell
     if (!result.success && result.errorType === 'EMPTY_PAGE') {
       const html = await playwrightFetch(prospect.website_url)
       if (html) {
-        result = scrapeHtml(html, keywords, criteria)
+        result = scrapeHtml(html, keywords, criteria, offerType)
         usedPlaywright = true
         playwrightFallbackCount++
       }
