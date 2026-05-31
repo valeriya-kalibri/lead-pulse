@@ -115,6 +115,8 @@ Seeded on deploy. Read-only at runtime.
 | warm_count | int | |
 | cold_count | int | |
 | status | text | 'pending' / 'processing' / 'complete' / 'error' |
+| hubspot_list_id | text | HubSpot list/segment ID if this list was imported from HubSpot — null for CSV-uploaded lists |
+| hubspot_list_object_type_id | text | '0-1' contact list / '0-2' company list — null for CSV-uploaded lists |
 | created_at | timestamptz | auto-managed |
 | updated_at | timestamptz | auto-managed |
 
@@ -645,7 +647,7 @@ Required body fields: `hubspotListId`, `hubspotListName`, `hubspotListObjectType
    - Contact list (`0-1` or null): `GET /contacts/v1/lists/{id}/contacts/all?count=100&vid-offset=...` with pagination. Extract `vid` as contact IDs, then resolve to company IDs via Associations API v4 (`POST /crm/v4/associations/contacts/companies/batch/read`).
    - Company list (`0-2`): `GET /crm/v3/lists/{id}/memberships?limit=100`
 2. For each company ID, fetch company + primary contact properties
-3. Create a new LeadPulse list with `status: 'pending'`, `industry_template_id` (UUID-validated), `industry_name`, `service_keywords`, `selected_criteria`
+3. Create a new LeadPulse list with `status: 'pending'`, `industry_template_id` (UUID-validated), `industry_name`, `service_keywords`, `selected_criteria`, `hubspot_list_id`, `hubspot_list_object_type_id`
 4. Insert prospects with `scrape_status: 'pending'` — ready for the Start Scraping flow
 
 **UUID guard:** `industry_template_id` must be a valid UUID — validated with regex before insert. Falls back to `null` if a slug (e.g. `'med_spa'`) is passed instead, preventing FK constraint failures when FALLBACK_TEMPLATES are used.
@@ -654,10 +656,20 @@ Required body fields: `hubspotListId`, `hubspotListName`, `hubspotListObjectType
 
 Required body fields: `currentListId`, `currentListName`
 
-1. Query HubSpot for companies where `leadpulse_list_name = currentListName`
-2. Match each record to an existing prospect (by `hubspot_company_id`, then `email`, then domain)
-3. Apply conditional upsert (see field ownership rules below)
-4. New records not yet in the list are added as new prospect rows
+Company IDs are collected from **two sources** and unioned (deduplicated via Set):
+
+**Source 1 — `leadpulse_list_name` property filter (existing behavior)**
+Query HubSpot for companies where `leadpulse_list_name = currentListName`. Catches every company previously synced from this LeadPulse list.
+
+**Source 2 — HubSpot segment members (new behavior)**
+If the list has a stored `hubspot_list_id` (set when the list was originally imported from HubSpot), re-read the current segment membership using the same `fetchSegmentCompanyIds` helper. This picks up any contacts/companies added to the HubSpot segment after the original import.
+
+After collecting all company IDs:
+1. Match each record to an existing prospect (by `hubspot_company_id`, then `email`, then domain)
+2. Apply conditional upsert (see field ownership rules below)
+3. New records not yet in the list are added as new prospect rows with `scrape_status: 'pending'`
+
+**Note:** Lists created via CSV upload have `hubspot_list_id = null` — Source 2 is skipped for them, so only Source 1 runs (unchanged behavior for those lists).
 
 #### Field Ownership — Pull vs Push
 

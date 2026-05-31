@@ -164,52 +164,46 @@ export async function POST(req: NextRequest) {
 
   const hsHeaders = { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' }
 
-  // ── Collect contact IDs from HubSpot list ────────────────────────────────
-  // For contact lists (v1 IDs): use v1 contacts endpoint — works without crm.lists.read
-  // For company lists (v3 IDs): use v3 memberships endpoint
+  // ── Helper: fetch all member company IDs from a HubSpot list ────────────
+  // Handles both contact lists (v1) and company lists (v3 memberships).
 
-  const contactIdsFromList: string[] = []
-  const companyIdsFromList: string[] = []
+  async function fetchSegmentCompanyIds(listId: string, objectTypeId: string | null): Promise<string[]> {
+    const contactIds: string[] = []
+    const directCompanyIds: string[] = []
 
-  if (source === 'hubspot_list') {
-    if (hubspotListObjectTypeId === '0-1' || hubspotListObjectTypeId === null) {
-      // Contact list — use v1 endpoint which works with crm.objects.contacts.read
-      let vidOffset: number | null = null
-      while (true) {
-        const url = `${HS_BASE}/contacts/v1/lists/${hubspotListId}/contacts/all?count=100${vidOffset ? `&vid-offset=${vidOffset}` : ''}`
-        const res = await fetch(url, { headers: hsHeaders })
-        if (!res.ok) break
-        const data = await res.json() as { contacts?: { vid: unknown }[]; 'has-more'?: boolean; 'vid-offset'?: number }
-        for (const c of data.contacts ?? []) contactIdsFromList.push(String(c.vid))
-        if (!data['has-more']) break
-        vidOffset = data['vid-offset'] ?? null
-        if (!vidOffset) break
-      }
-    } else {
-      // Company list — use v3 memberships endpoint
+    if (objectTypeId === '0-2') {
+      // Company list — v3 memberships endpoint
       let after: string | null = null
       while (true) {
         const res = await fetch(
-          `${HS_BASE}/crm/v3/lists/${hubspotListId}/memberships?limit=100${after ? `&after=${after}` : ''}`,
+          `${HS_BASE}/crm/v3/lists/${listId}/memberships?limit=100${after ? `&after=${after}` : ''}`,
           { headers: hsHeaders }
         )
         if (!res.ok) break
         const data = await res.json() as { results?: { recordId: unknown }[]; paging?: { next?: { after?: string } } }
-        for (const m of data.results ?? []) companyIdsFromList.push(String(m.recordId))
+        for (const m of data.results ?? []) directCompanyIds.push(String(m.recordId))
         after = data.paging?.next?.after ?? null
         if (!after) break
       }
+    } else {
+      // Contact list (objectTypeId '0-1' or null) — v1 contacts endpoint
+      let vidOffset: number | null = null
+      while (true) {
+        const url = `${HS_BASE}/contacts/v1/lists/${listId}/contacts/all?count=100${vidOffset ? `&vid-offset=${vidOffset}` : ''}`
+        const res = await fetch(url, { headers: hsHeaders })
+        if (!res.ok) break
+        const data = await res.json() as { contacts?: { vid: unknown }[]; 'has-more'?: boolean; 'vid-offset'?: number }
+        for (const c of data.contacts ?? []) contactIds.push(String(c.vid))
+        if (!data['has-more']) break
+        vidOffset = data['vid-offset'] ?? null
+        if (!vidOffset) break
+      }
     }
-  }
 
-  // ── Resolve to company IDs ────────────────────────────────────────────────
-
-  const companyIds: string[] = [...companyIdsFromList]
-
-  if (contactIdsFromList.length > 0) {
-    // Contact list — look up associated company for each contact
-    for (let i = 0; i < contactIdsFromList.length; i += 100) {
-      const chunk = contactIdsFromList.slice(i, i + 100)
+    // Resolve contacts → companies via Associations API
+    const resolvedCompanyIds: string[] = [...directCompanyIds]
+    for (let i = 0; i < contactIds.length; i += 100) {
+      const chunk = contactIds.slice(i, i + 100)
       const res = await fetch(`${HS_BASE}/crm/v4/associations/contacts/companies/batch/read`, {
         method: 'POST',
         headers: hsHeaders,
@@ -219,13 +213,25 @@ export async function POST(req: NextRequest) {
       const data = await res.json()
       for (const r of data.results ?? []) {
         const companyId = r.to?.[0]?.toObjectId
-        if (companyId) companyIds.push(String(companyId))
+        if (companyId) resolvedCompanyIds.push(String(companyId))
       }
     }
+    return resolvedCompanyIds
+  }
+
+  // ── Collect company IDs ───────────────────────────────────────────────────
+
+  const companyIdSet = new Set<string>()
+
+  if (source === 'hubspot_list') {
+    // Importing a HubSpot segment as a brand-new LeadPulse list
+    const ids = await fetchSegmentCompanyIds(hubspotListId, hubspotListObjectTypeId)
+    for (const id of ids) companyIdSet.add(id)
   }
 
   if (source === 'leadpulse_list') {
-    // Search companies by leadpulse_list_name
+    // ── Source 1: companies previously synced from this LeadPulse list ─────
+    // Query by the leadpulse_list_name custom property (existing behavior)
     let after: string | null = null
     while (true) {
       const res = await fetch(`${HS_BASE}/crm/v3/objects/companies/search`, {
@@ -240,11 +246,29 @@ export async function POST(req: NextRequest) {
       })
       if (!res.ok) break
       const data = await res.json() as { results?: { id: unknown }[]; paging?: { next?: { after?: string } } }
-      for (const r of data.results ?? []) companyIds.push(String(r.id))
+      for (const r of data.results ?? []) companyIdSet.add(String(r.id))
       after = data.paging?.next?.after ?? null
       if (!after) break
     }
+
+    // ── Source 2: current segment members (if list originated from HubSpot) ─
+    // Fetch the stored hubspot_list_id from the LeadPulse list record
+    const { data: listRecord } = await db
+      .from('prospect_lists')
+      .select('hubspot_list_id, hubspot_list_object_type_id')
+      .eq('id', currentListId)
+      .single()
+
+    if (listRecord?.hubspot_list_id) {
+      const segmentIds = await fetchSegmentCompanyIds(
+        listRecord.hubspot_list_id,
+        listRecord.hubspot_list_object_type_id ?? null
+      )
+      for (const id of segmentIds) companyIdSet.add(id)
+    }
   }
+
+  const companyIds: string[] = [...companyIdSet]
 
   if (companyIds.length === 0) {
     return NextResponse.json({ imported: 0, updated: 0, newListId: null })
@@ -282,6 +306,8 @@ export async function POST(req: NextRequest) {
         warm_count: 0,
         cold_count: 0,
         status: 'pending',
+        hubspot_list_id: hubspotListId ?? null,
+        hubspot_list_object_type_id: hubspotListObjectTypeId ?? null,
       })
       .select('id')
       .single()

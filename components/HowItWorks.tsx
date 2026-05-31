@@ -13,8 +13,8 @@ const STEPS = [
         desc: 'Export your prospects from Apollo or HubSpot as a CSV. LeadPulse auto-reads standard Apollo and HubSpot export columns — company name, website, contact name, email, phone, city, state, employee count, and revenue. No column renaming needed. If multiple contacts share the same website, LeadPulse scrapes it once and applies the results to all of them.',
       },
       {
-        label: 'Import from HubSpot (Pro)',
-        desc: 'Click "Import from HubSpot" on this page. Select any contact or company list from your HubSpot account, give it a name in LeadPulse, and pick an industry. LeadPulse pulls the companies and their associated contacts directly — no CSV export required.',
+        label: 'Import New from HubSpot (Pro)',
+        desc: 'Click "Import New from HubSpot" on this page. Select any contact or company list from your HubSpot account, give it a name in LeadPulse, and pick an industry. LeadPulse pulls the companies and their associated contacts directly — no CSV export required. A new LeadPulse list is created and linked to that HubSpot segment so future updates stay in sync.',
       },
     ],
     note: 'Exporting from HubSpot as CSV? Use Export View → CSV. Under Properties, select "Properties and associations in your view." Include: Company Name, Website Domain, Associated Contact name, email, phone, City, State, Number of Employees, Annual Revenue. Check "Include associated record name" and "Include up to 1,000 associated records per column." Do not select All Properties.',
@@ -57,12 +57,12 @@ const STEPS = [
   },
   {
     n: '06',
-    title: 'Export, push to HubSpot, or refresh from HubSpot',
+    title: 'Export, push to HubSpot, or update from HubSpot',
     body: 'Three options for what to do with your qualified list:',
     sub: [
       { label: 'Export CSV', desc: 'Download your full qualified list — scores, detected signals, Intel Card fields — for any outreach tool or CRM.' },
       { label: 'Sync to HubSpot (Pro)', desc: 'Push your qualified prospects into HubSpot CRM. For each prospect, LeadPulse upserts the company record (matched by domain), upserts the contact (matched by email then phone), associates them, and writes the LeadPulse score, signals, and Intel Card to dedicated custom properties. No duplicates are created. LeadPulse is always the source of truth on a push — scores and intel overwrite whatever was there.' },
-      { label: 'Refresh from HubSpot (Pro)', desc: 'Pull updated contact info back from HubSpot into an existing LeadPulse list — names, emails, phone numbers, company details. A refresh never overwrites enrichment data. Scores, intel cards, and detected signals are never touched. HubSpot owns contact info; LeadPulse owns qualification data.' },
+      { label: 'Update from HubSpot (Pro)', desc: 'Pull fresh data from HubSpot back into an existing LeadPulse list. Two ways to trigger it: on the My Lists page, check the list you want to update and click "Update from HubSpot"; or open a list and click "Refresh from HubSpot" in the list toolbar. Both do the same thing — they refresh contact info (names, emails, phone numbers, company details) and, if the list was originally imported from a HubSpot segment, also pull in any new companies added to that segment since the original import. Scores, intel cards, and detected signals are never touched. HubSpot owns contact info; LeadPulse owns qualification data.' },
     ],
   },
 ]

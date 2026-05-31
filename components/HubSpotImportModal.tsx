@@ -121,7 +121,7 @@ export default function HubSpotImportModal({ userId, isPro, hasHubspotKey, templ
           <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
           </svg>
-          Import from HubSpot
+          Import New from HubSpot
         </button>
         {disabledReason && (
           <div className="absolute right-0 top-full mt-1.5 z-10 hidden group-hover:block whitespace-nowrap rounded-lg bg-gray-800 px-2.5 py-1.5 text-xs text-white shadow-lg">
@@ -136,7 +136,7 @@ export default function HubSpotImportModal({ userId, isPro, hasHubspotKey, templ
           <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg p-6 space-y-5">
               <div className="flex items-center justify-between">
-                <h2 className="text-base font-semibold text-[#2E3A59]">Import from HubSpot</h2>
+                <h2 className="text-base font-semibold text-[#2E3A59]">Import New from HubSpot</h2>
                 <button
                   onClick={() => setOpen(false)}
                   className="text-gray-400 hover:text-gray-600 transition-colors"

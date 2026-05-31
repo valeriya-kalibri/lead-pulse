@@ -78,6 +78,8 @@ export interface ProspectList {
   selected_criteria: string[] | null
   filter_summary: string | null
   offer_type: OfferType
+  hubspot_list_id: string | null
+  hubspot_list_object_type_id: string | null
   created_at: string
   updated_at: string
 }

@@ -56,8 +56,8 @@ const STEPS = [
   },
   {
     n: '08',
-    title: 'Export, push to HubSpot, or pull from HubSpot',
-    body: 'Download your qualified list as a CSV for any outreach tool. Or use HubSpot sync (Pro plan) — push your qualified prospects into HubSpot CRM with scores, intel, email sequences, and signals attached, or pull contacts in from an existing HubSpot list to enrich them inside LeadPulse. All field names in HubSpot stay the same regardless of offer — outreach hook, intel, email sequences — populated with offer-relevant content.',
+    title: 'Export, push to HubSpot, or update from HubSpot',
+    body: 'Download your qualified list as a CSV for any outreach tool. Or use HubSpot sync (Pro plan) — push your qualified prospects into HubSpot CRM with scores, intel, email sequences, and signals attached; import a new list directly from a HubSpot segment; or update an existing LeadPulse list with fresh contacts and contact info from HubSpot. All field names in HubSpot stay the same regardless of offer — outreach hook, intel, email sequences — populated with offer-relevant content.',
   },
 ]
 
@@ -166,14 +166,14 @@ export default function HowItWorks() {
           </div>
 
           <div className="border-t border-gray-100 pt-4 space-y-2">
-            <p className="text-xs font-medium text-[#2E3A59]">Pulling from HubSpot</p>
+            <p className="text-xs font-medium text-[#2E3A59]">Importing and updating from HubSpot</p>
             <p className="text-xs text-gray-500 leading-relaxed">
-              Pulling is the reverse — it brings contacts from HubSpot into LeadPulse so you can qualify and enrich them. There are two pull modes:
+              There are two ways to bring HubSpot data into LeadPulse:
             </p>
             <ul className="space-y-1.5 pl-1">
               {[
-                { label: 'HubSpot List', desc: 'select any Company List you have saved in HubSpot. LeadPulse fetches every company in that list, pulls the primary associated contact for each one, and creates a new LeadPulse list ready for qualification. The new list name matches the HubSpot list name.' },
-                { label: 'LeadPulse List', desc: 'pulls back contacts that were previously pushed from the current list. LeadPulse searches HubSpot for all records tagged with this list name and refreshes their contact info — name, email, phone, company details — inside LeadPulse.' },
+                { label: 'Import New from HubSpot', desc: 'On the My Lists page, click "Import New from HubSpot." Select any contact or company segment from your HubSpot account, give the new list a name, and pick an industry. LeadPulse fetches every company in that segment and their associated contacts, creates a new LeadPulse list, and links it to the originating HubSpot segment for future updates.' },
+                { label: 'Update from HubSpot', desc: 'On the My Lists page, check the list you want to update and click "Update from HubSpot." LeadPulse refreshes contact info for every prospect in the list and — if the list was originally imported from a HubSpot segment — also pulls in any new companies added to that segment since the original import. You can also trigger the same update from within a list by clicking "Refresh from HubSpot" in the list toolbar.' },
               ].map((item) => (
                 <li key={item.label} className="flex gap-2 text-xs text-gray-500 leading-relaxed">
                   <span className="font-medium text-[#2E3A59] flex-shrink-0">{item.label} —</span>
@@ -182,7 +182,7 @@ export default function HowItWorks() {
               ))}
             </ul>
             <p className="text-xs text-gray-500 leading-relaxed">
-              A pull never overwrites enrichment data. If a prospect has already been scraped, LeadPulse will refresh their contact info from HubSpot but will never touch the score, intel card, email sequences, outreach hook, or any detected signals. HubSpot owns contact info. LeadPulse owns qualification data.
+              Neither operation overwrites enrichment data. If a prospect has already been scraped, LeadPulse refreshes their contact info but never touches the score, intel card, email sequences, outreach hook, or any detected signals. HubSpot owns contact info. LeadPulse owns qualification data.
             </p>
           </div>
 

@@ -126,7 +126,7 @@ export default function HubSpotPullModal({ listId, listName, userId, isPro, hasH
           )}
 
           <p className="text-xs text-gray-400">
-            Updates contact info for existing prospects. Enriched records are not overwritten.
+            Refreshes contact info for all prospects in this list. If this list was originally imported from a HubSpot segment, any new companies added to that segment since import will also be pulled in. Scores, intel, and detected signals are never overwritten.
           </p>
 
           {result && (
