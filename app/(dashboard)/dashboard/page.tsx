@@ -1,9 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import type { IndustryTemplate, ProspectList } from '@/types'
 import { FALLBACK_TEMPLATES } from '@/lib/templates'
-import HowItWorks from '@/components/HowItWorks'
-import HowEmailSequencingWorks from '@/components/HowEmailSequencingWorks'
-import HubSpotApolloFieldGuide from '@/components/HubSpotApolloFieldGuide'
 import DashboardListsPanel from '@/components/DashboardListsPanel'
 
 export default async function DashboardPage() {
@@ -55,10 +52,6 @@ export default async function DashboardPage() {
           )}
         </div>
       </div>
-
-      <HowItWorks />
-      <HowEmailSequencingWorks />
-      <HubSpotApolloFieldGuide />
 
       <DashboardListsPanel
         lists={(lists ?? []) as ProspectList[]}
