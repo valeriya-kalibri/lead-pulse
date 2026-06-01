@@ -9,8 +9,10 @@ export async function processJob(
   userId: string,
   keywords: string[],
   criteria: string[],
-  db: ReturnType<typeof createServiceClient>
+  db: ReturnType<typeof createServiceClient>,
+  isPro = false
 ) {
+  const SCRAPE_DELAY = isPro ? 150 : 500
   // Fetch offer type from the list — drives scoring logic
   const { data: listRecord } = await db
     .from('prospect_lists')
@@ -103,7 +105,7 @@ export async function processJob(
       .update({ processed_urls: processed, failed_urls: failed })
       .eq('id', jobId)
 
-    await sleep(500)
+    await sleep(SCRAPE_DELAY)
   }
 
   const errorSummary: ErrorSummary & { playwright_fallback_count?: number } = {

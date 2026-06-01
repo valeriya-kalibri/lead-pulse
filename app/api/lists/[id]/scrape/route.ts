@@ -88,7 +88,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     }).eq('id', listId)
   }
 
-  after(() => processJob(listId, job!.id, user.id, keywords, criteria, db).catch(console.error))
+  after(() => processJob(listId, job!.id, user.id, keywords, criteria, db, plan === 'pro').catch(console.error))
 
   return NextResponse.json({ job_id: job?.id })
 }

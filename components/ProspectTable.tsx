@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect, Fragment } from 'react'
 import type { Prospect, IntelData, ApolloStatus } from '@/types'
 import ScoreBadge from './ScoreBadge'
 import ScrapeStatusBadge from './ScrapeStatusBadge'
-import FilterBar, { type Filters } from './FilterBar'
+import FilterBar, { type Filters, DEFAULT_FILTERS } from './FilterBar'
 import IntelCard from './IntelCard'
 
 interface Props {
@@ -64,7 +64,7 @@ function EditableCell({
           if (e.key === 'Escape') onCancel()
         }}
         onClick={(e) => e.stopPropagation()}
-        className="w-full rounded border border-[#AABFFF] px-1.5 py-0.5 text-xs text-[#2E3A59] focus:outline-none"
+        className="w-full rounded border border-brand-light px-1.5 py-0.5 text-xs text-brand focus:outline-none"
       />
     )
   }
@@ -77,7 +77,7 @@ function EditableCell({
         e.stopPropagation()
         onStartEdit(id, field, displayValue)
       }}
-      className="text-xs text-gray-600 hover:text-[#2E3A59] hover:underline text-left w-full"
+      className="text-xs text-gray-600 hover:text-brand hover:underline text-left w-full"
     >
       {displayValue ?? <span className="text-gray-300">—</span>}
     </button>
@@ -125,14 +125,7 @@ export default function ProspectTable({
     setProspects(initial)
   }, [initial])
 
-  const [filters, setFilters] = useState<Filters>({
-    score: 'all',
-    hasChat: 'all',
-    hasBooking: 'all',
-    search: '',
-    city: '',
-    state: '',
-  })
+  const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS)
   const [sort, setSort] = useState<{ key: SortKey; dir: SortDir }>({ key: 'score', dir: 'asc' })
   const [expanded, setExpanded] = useState<string | null>(null)
   const [editing, setEditing] = useState<EditState | null>(null)
@@ -142,6 +135,9 @@ export default function ProspectTable({
   const [syncing, setSyncing] = useState(false)
   const [syncToast, setSyncToast] = useState<SyncToast | null>(null)
   const [removingId, setRemovingId] = useState<string | null>(null)
+  const [bulkField, setBulkField] = useState<'employee_count' | 'revenue_range'>('employee_count')
+  const [bulkValue, setBulkValue] = useState('')
+  const [bulkApplying, setBulkApplying] = useState(false)
 
   // 5 fixed columns (Checkbox, Score, Intel/Hook, Business, URL) + 1 per active criterion
   const colCount = 5 + ALL_COL_CRITERIA.filter((c) => criteria.includes(c)).length
@@ -219,9 +215,36 @@ export default function ProspectTable({
         if (filters.hasChat === 'yes' && p.has_chatbot !== 'yes') return false
         if (filters.hasChat === 'no' && p.has_chatbot !== 'no') return false
       }
+      if (criteria.includes('contact_form')) {
+        if (filters.hasContactForm === 'yes' && p.has_contact_form !== 'yes') return false
+        if (filters.hasContactForm === 'no' && p.has_contact_form !== 'no') return false
+      }
       if (criteria.includes('online_booking')) {
         if (filters.hasBooking === 'yes' && p.has_online_booking !== 'yes') return false
         if (filters.hasBooking === 'no' && p.has_online_booking !== 'no') return false
+      }
+      if (criteria.includes('services')) {
+        const hasServices = p.high_ticket_services && p.high_ticket_services.length > 0
+        if (filters.hasServices === 'yes' && !hasServices) return false
+        if (filters.hasServices === 'no' && hasServices) return false
+      }
+      if (criteria.includes('crm_emr_platform')) {
+        if (filters.hasCrmEmr === 'yes' && !p.crm_emr_platform) return false
+        if (filters.hasCrmEmr === 'no' && p.crm_emr_platform) return false
+      }
+      if (criteria.includes('analytics')) {
+        if (filters.hasAnalytics === 'yes' && !p.analytics_platform) return false
+        if (filters.hasAnalytics === 'no' && p.analytics_platform) return false
+      }
+      if (criteria.includes('locations')) {
+        if (filters.isMultiLocation === 'yes' && !p.is_multi_location) return false
+        if (filters.isMultiLocation === 'no' && p.is_multi_location) return false
+      }
+      if (criteria.includes('employee_count') && filters.employeeCount) {
+        if (p.employee_count !== filters.employeeCount) return false
+      }
+      if (criteria.includes('revenue_range') && filters.revenueRange) {
+        if (p.revenue_range !== filters.revenueRange) return false
       }
       if (criteria.includes('city') && filters.city) {
         if (p.city !== filters.city) return false
@@ -275,6 +298,31 @@ export default function ProspectTable({
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ [state.field]: state.value || null }),
     }).catch(console.error)
+  }
+
+  async function applyBulkEdit() {
+    if (!bulkValue || selectedIds.size === 0) return
+    setBulkApplying(true)
+    try {
+      const res = await fetch('/api/prospects/bulk-update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: Array.from(selectedIds), field: bulkField, value: bulkValue }),
+      })
+      if (!res.ok) {
+        const { error } = await res.json().catch(() => ({ error: 'Unknown error' }))
+        alert(`Bulk edit failed: ${error}`)
+        return
+      }
+      setProspects((prev) =>
+        prev.map((p) => selectedIds.has(p.id) ? { ...p, [bulkField]: bulkValue } : p)
+      )
+      setBulkValue('')
+    } catch {
+      alert('Bulk edit failed — check your network connection.')
+    } finally {
+      setBulkApplying(false)
+    }
   }
 
   async function removeProspect(id: string) {
@@ -354,12 +402,12 @@ export default function ProspectTable({
     const active = sort.key === col
     return (
       <th
-        className="text-left px-4 py-3 font-medium text-gray-500 cursor-pointer select-none hover:text-[#2E3A59] whitespace-nowrap"
+        className="text-left px-4 py-3 font-medium text-gray-500 cursor-pointer select-none hover:text-brand whitespace-nowrap"
         onClick={() => toggleSort(col)}
       >
         {label}
         {active && (
-          <span className="ml-1 text-[#AABFFF]">{sort.dir === 'asc' ? '↑' : '↓'}</span>
+          <span className="ml-1 text-brand-light">{sort.dir === 'asc' ? '↑' : '↓'}</span>
         )}
       </th>
     )
@@ -423,7 +471,7 @@ export default function ProspectTable({
             ) : (
               <a
                 href="/settings"
-                className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-500 hover:border-[#2E3A59] hover:text-[#2E3A59] transition-colors whitespace-nowrap"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-500 hover:border-brand hover:text-brand transition-colors whitespace-nowrap"
               >
                 Connect HubSpot
               </a>
@@ -431,7 +479,7 @@ export default function ProspectTable({
           )}
           <a
             href={`/api/prospects/export?list_id=${listId}&scores=hot,warm`}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 hover:border-[#2E3A59] hover:text-[#2E3A59] transition-colors whitespace-nowrap"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 hover:border-brand hover:text-brand transition-colors whitespace-nowrap"
           >
             <svg
               className="w-3.5 h-3.5"
@@ -451,6 +499,53 @@ export default function ProspectTable({
         </div>
       </div>
 
+      {/* Bulk edit bar — appears when 1+ rows are selected */}
+      {selectedIds.size > 0 && (
+        <div className="mb-3 flex flex-wrap items-center gap-3 rounded-lg border border-brand-light/40 bg-brand-light/10 px-4 py-2.5">
+          <span className="text-xs font-medium text-brand">{selectedIds.size} selected</span>
+          <span className="text-gray-300 text-xs">|</span>
+          <span className="text-xs text-gray-500">Bulk edit:</span>
+          <select
+            value={bulkField}
+            onChange={(e) => { setBulkField(e.target.value as typeof bulkField); setBulkValue('') }}
+            className="rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-xs text-brand focus:outline-none focus:ring-2 focus:ring-brand-light"
+          >
+            <option value="employee_count">Employee count</option>
+            <option value="revenue_range">Revenue range</option>
+          </select>
+          <select
+            value={bulkValue}
+            onChange={(e) => setBulkValue(e.target.value)}
+            className="rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-xs text-brand focus:outline-none focus:ring-2 focus:ring-brand-light"
+          >
+            <option value="">— select value —</option>
+            {bulkField === 'employee_count' ? (
+              <>
+                <option value="1-5">1–5</option>
+                <option value="6-15">6–15</option>
+                <option value="16-50">16–50</option>
+                <option value="50+">50+</option>
+              </>
+            ) : (
+              <>
+                <option value="<$500K">&lt;$500K</option>
+                <option value="$500K-$1M">$500K–$1M</option>
+                <option value="$1M-$5M">$1M–$5M</option>
+                <option value="$5M+">$5M+</option>
+              </>
+            )}
+          </select>
+          <button
+            type="button"
+            onClick={applyBulkEdit}
+            disabled={!bulkValue || bulkApplying}
+            className="rounded-lg bg-brand px-3 py-1.5 text-xs font-medium text-white hover:bg-brand/90 disabled:opacity-40 transition-colors"
+          >
+            {bulkApplying ? 'Applying…' : 'Apply'}
+          </button>
+        </div>
+      )}
+
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
         <div className="px-4 py-2 border-b border-gray-50 text-xs text-gray-400">
           {sorted.length} of {prospects.length} prospects
@@ -465,7 +560,7 @@ export default function ProspectTable({
                     type="checkbox"
                     checked={sorted.length > 0 && selectedIds.size === sorted.length}
                     onChange={toggleSelectAll}
-                    className="rounded border-gray-300 text-[#2E3A59] focus:ring-[#AABFFF]"
+                    className="rounded border-gray-300 text-brand focus:ring-brand-light"
                   />
                 </th>
                 <SortTh col="score" label="Score" />
@@ -530,7 +625,7 @@ export default function ProspectTable({
                         type="checkbox"
                         checked={selectedIds.has(p.id)}
                         onChange={() => toggleSelect(p.id)}
-                        className="rounded border-gray-300 text-[#2E3A59] focus:ring-[#AABFFF]"
+                        className="rounded border-gray-300 text-brand focus:ring-brand-light"
                       />
                     </td>
                     <td className="px-4 py-3">
@@ -549,7 +644,7 @@ export default function ProspectTable({
                               <button
                                 type="button"
                                 onClick={() => setOpenIntel(openIntel === p.id ? null : p.id)}
-                                className="text-xs font-medium text-[#AABFFF] hover:text-[#2E3A59] transition-colors"
+                                className="text-xs font-medium text-brand-light hover:text-brand transition-colors"
                               >
                                 {openIntel === p.id ? 'Close' : 'View Intel'}
                               </button>
@@ -565,14 +660,14 @@ export default function ProspectTable({
                             </div>
                           </div>
                         ) : loadingIntel === p.id ? (
-                          <span className="text-xs text-[#AABFFF] animate-pulse">
+                          <span className="text-xs text-brand-light animate-pulse">
                             Researching prospect…
                           </span>
                         ) : (
                           <button
                             type="button"
                             onClick={() => generateIntel(p.id)}
-                            className="inline-flex items-center gap-1 rounded-lg border border-[#AABFFF]/40 bg-[#F5F7FF] px-2.5 py-1 text-xs font-medium text-[#2E3A59] hover:border-[#AABFFF] hover:bg-[#AABFFF]/10 transition-colors whitespace-nowrap"
+                            className="inline-flex items-center gap-1 rounded-lg border border-brand-light/40 bg-[#F5F7FF] px-2.5 py-1 text-xs font-medium text-brand hover:border-brand-light hover:bg-brand-light/10 transition-colors whitespace-nowrap"
                           >
                             ⚡ Generate Intel
                           </button>
@@ -589,7 +684,7 @@ export default function ProspectTable({
                           errorType={p.error_type}
                           errorMessage={p.scrape_error}
                         />
-                        <span className="font-medium text-[#2E3A59] truncate">
+                        <span className="font-medium text-brand truncate">
                           {p.business_name ?? <span className="text-gray-300">—</span>}
                         </span>
                         {p.hubspot_synced_at && (
@@ -621,7 +716,7 @@ export default function ProspectTable({
                         target="_blank"
                         rel="noopener noreferrer"
                         onClick={(e) => e.stopPropagation()}
-                        className="text-[#2E3A59] hover:underline truncate block text-xs"
+                        className="text-brand hover:underline truncate block text-xs"
                       >
                         {p.website_url.replace(/^https?:\/\//, '')}
                       </a>
@@ -784,16 +879,16 @@ export default function ProspectTable({
                             <div className="col-span-2 grid grid-cols-2 gap-3 pb-3 mb-1 border-b border-gray-200">
                               {p.contact_name && (
                                 <div>
-                                  <p className="font-medium text-[#2E3A59] mb-0.5">Contact</p>
+                                  <p className="font-medium text-brand mb-0.5">Contact</p>
                                   <p className="text-gray-500">{p.contact_name}</p>
                                 </div>
                               )}
                               {p.email && (
                                 <div>
-                                  <p className="font-medium text-[#2E3A59] mb-0.5">Email</p>
+                                  <p className="font-medium text-brand mb-0.5">Email</p>
                                   <a
                                     href={`mailto:${p.email}`}
-                                    className="text-[#2E3A59] hover:underline"
+                                    className="text-brand hover:underline"
                                     onClick={(e) => e.stopPropagation()}
                                   >
                                     {p.email}
@@ -802,13 +897,13 @@ export default function ProspectTable({
                               )}
                               {p.phone && (
                                 <div>
-                                  <p className="font-medium text-[#2E3A59] mb-0.5">Phone</p>
+                                  <p className="font-medium text-brand mb-0.5">Phone</p>
                                   <p className="text-gray-500">{p.phone}</p>
                                 </div>
                               )}
                               {(p.city || p.state) && (
                                 <div>
-                                  <p className="font-medium text-[#2E3A59] mb-0.5">Location</p>
+                                  <p className="font-medium text-brand mb-0.5">Location</p>
                                   <p className="text-gray-500">
                                     {[p.city, p.state].filter(Boolean).join(', ')}
                                   </p>
@@ -819,16 +914,16 @@ export default function ProspectTable({
 
                           {/* Qualification signals */}
                           <div>
-                            <p className="font-medium text-[#2E3A59] mb-1">Score reason</p>
+                            <p className="font-medium text-brand mb-1">Score reason</p>
                             <p className="text-gray-500">{p.score_reason ?? '—'}</p>
                           </div>
                           <div>
-                            <p className="font-medium text-[#2E3A59] mb-1">Outreach hook</p>
+                            <p className="font-medium text-brand mb-1">Outreach hook</p>
                             <p className="text-gray-500">{p.outreach_hook ?? '—'}</p>
                           </div>
                           {p.high_ticket_services?.length ? (
                             <div>
-                              <p className="font-medium text-[#2E3A59] mb-1">
+                              <p className="font-medium text-brand mb-1">
                                 All services detected
                               </p>
                               <p className="text-gray-500">
@@ -838,13 +933,13 @@ export default function ProspectTable({
                           ) : null}
                           {p.crm_emr_platform && (
                             <div>
-                              <p className="font-medium text-[#2E3A59] mb-1">CRM / EMR platform</p>
+                              <p className="font-medium text-brand mb-1">CRM / EMR platform</p>
                               <p className="text-gray-500">{p.crm_emr_platform}</p>
                             </div>
                           )}
                           {p.crm_platform && (
                             <div>
-                              <p className="font-medium text-[#2E3A59] mb-1">CRM</p>
+                              <p className="font-medium text-brand mb-1">CRM</p>
                               <p className="text-gray-500">{p.crm_platform}</p>
                             </div>
                           )}

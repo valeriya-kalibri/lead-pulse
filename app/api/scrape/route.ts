@@ -177,7 +177,7 @@ export async function POST(req: NextRequest) {
     .select('id')
     .single()
 
-  after(() => processJob(list.id, job!.id, user.id, keywords, criteria, db).catch(console.error))
+  after(() => processJob(list.id, job!.id, user.id, keywords, criteria, db, plan === 'pro').catch(console.error))
 
   return NextResponse.json({ list_id: list.id, job_id: job?.id })
 }
