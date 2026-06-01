@@ -263,20 +263,15 @@ export default function NewListForm({ templates }: Props) {
             const checked = criteria.includes(c.id)
             const isDefault = OFFERS[offerType].defaultCriteria.includes(c.id)
             return (
-              <label
+              <div
                 key={c.id}
-                className={`flex items-start gap-3 rounded-lg border px-3 py-3 cursor-pointer transition-all ${
+                onClick={() => toggleCriterion(c.id)}
+                className={`flex items-start gap-3 rounded-lg border px-3 py-3 cursor-pointer transition-all select-none ${
                   checked
                     ? 'border-[#AABFFF] bg-[#AABFFF]/10 shadow-[inset_0_0_0_1px_#AABFFF]'
                     : 'border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50'
                 }`}
               >
-                <input
-                  type="checkbox"
-                  className="sr-only"
-                  checked={checked}
-                  onChange={() => toggleCriterion(c.id)}
-                />
                 <span
                   className={`flex-shrink-0 mt-0.5 w-4 h-4 rounded border flex items-center justify-center transition-colors ${
                     checked ? 'bg-[#2E3A59] border-[#2E3A59]' : 'border-gray-300 bg-white'
@@ -299,7 +294,7 @@ export default function NewListForm({ templates }: Props) {
                   </div>
                   <p className="text-xs text-gray-400 mt-0.5 leading-relaxed">{c.description}</p>
                 </div>
-              </label>
+              </div>
             )
           })}
         </div>
