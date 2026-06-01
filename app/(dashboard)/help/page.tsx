@@ -1,5 +1,6 @@
 import HowItWorks from '@/components/HowItWorks'
 import HowListsWork from '@/components/HowListsWork'
+import HowCSVImportWorks from '@/components/HowCSVImportWorks'
 import HowEmailSequencingWorks from '@/components/HowEmailSequencingWorks'
 import HubSpotApolloFieldGuide from '@/components/HubSpotApolloFieldGuide'
 
@@ -13,6 +14,7 @@ export default function HelpPage() {
 
       <HowItWorks />
       <HowListsWork />
+      <HowCSVImportWorks />
       <HowEmailSequencingWorks />
       <HubSpotApolloFieldGuide />
     </div>

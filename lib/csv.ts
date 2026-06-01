@@ -12,6 +12,8 @@ export interface ParsedRow {
   email?: string
   city?: string
   state?: string
+  job_title?: string
+  has_business_email?: boolean
 }
 
 // Strip everything except lowercase letters and digits — used on both header names
@@ -50,6 +52,7 @@ export function parseCSV(content: string): ParsedRow[] {
       pick(
         row,
         'companydomainname',   // HubSpot "Company Domain Name"
+        'companydomain',       // Apollo "Company Domain"
         'websiteurl',          // HubSpot "Website URL" / Apollo "Company Website URL"
         'website',
         'companywebsite',
@@ -60,7 +63,7 @@ export function parseCSV(content: string): ParsedRow[] {
         'homepage',
         'webaddress',
         'companywebaddress',
-      ) || Object.values(row).find((v) => /^https?:\/\//i.test(v?.trim() ?? ''))
+      ) || Object.values(row).find((v) => /^https?:\/\//i.test(v?.trim() ?? '') && !/linkedin\.com/i.test(v?.trim() ?? ''))
 
     if (!urlValue?.trim()) continue
 
@@ -172,6 +175,17 @@ export function parseCSV(content: string): ParsedRow[] {
     // HubSpot "State/Region" → "stateregion"
     const state = pick(row, 'state', 'stateregion', 'companystate', 'province', 'stateprovince')
 
+    // ----- Job title — used for contact priority selection when deduplicating -----
+    const job_title = pick(row, 'jobtitle', 'title', 'position', 'role', 'jobrole', 'personjobtitle')
+
+    // ----- Business email flag — tiebreaker for priority selection -----
+    const has_business_email = !!(
+      row['businessemail']?.trim() ||
+      row['businessverifiedemails']?.trim() ||
+      row['workemail']?.trim() ||
+      row['corporateemail']?.trim()
+    )
+
     rows.push({
       url,
       business_name,
@@ -182,6 +196,8 @@ export function parseCSV(content: string): ParsedRow[] {
       email,
       city,
       state,
+      job_title,
+      has_business_email,
     })
   }
 

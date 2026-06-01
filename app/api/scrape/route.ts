@@ -1,12 +1,47 @@
 import { NextRequest, NextResponse, after } from 'next/server'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
-import { parseCSV } from '@/lib/csv'
+import { parseCSV, type ParsedRow } from '@/lib/csv'
 import { ALL_CRITERIA } from '@/lib/criteria'
 import { processJob } from '@/lib/scraper/processJob'
 
 export const maxDuration = 300
 
 const STARTER_MONTHLY_LIMIT = 250
+
+// Contact priority tiers for deduplication — lower number wins.
+// Goal: reach the person who controls the budget, not the clinical lead.
+function contactTier(jobTitle?: string): number {
+  const t = (jobTitle ?? '').toLowerCase()
+  if (/owner|founder|co-owner|co owner|partner/.test(t)) return 1
+  if (/ceo|chief executive|president|principal/.test(t)) return 2
+  if (/medical director|clinical director|cmo|chief medical/.test(t)) return 3
+  if (/practice manager|operations manager|office manager/.test(t)) return 4
+  return 5
+}
+
+// For each unique URL, pick the single highest-priority contact.
+// Tiebreakers: business email > personal only, then has phone, then first encountered.
+function pickBestContacts(rows: ParsedRow[]): ParsedRow[] {
+  const best = new Map<string, ParsedRow>()
+  for (const row of rows) {
+    const key = row.url.toLowerCase().replace(/\/$/, '')
+    const current = best.get(key)
+    if (!current) { best.set(key, row); continue }
+
+    const tierRow = contactTier(row.job_title)
+    const tierCurrent = contactTier(current.job_title)
+    if (tierRow < tierCurrent) { best.set(key, row); continue }
+    if (tierRow > tierCurrent) continue
+
+    // Same tier — tiebreak 1: business email
+    if (row.has_business_email && !current.has_business_email) { best.set(key, row); continue }
+    if (!row.has_business_email && current.has_business_email) continue
+
+    // Tiebreak 2: has phone
+    if (row.phone && !current.phone) { best.set(key, row); continue }
+  }
+  return Array.from(best.values())
+}
 
 async function getCurrentMonthUsage(supabase: ReturnType<typeof createServiceClient>, userId: string) {
   const month = new Date().toISOString().slice(0, 7)
@@ -77,15 +112,8 @@ export async function POST(req: NextRequest) {
       })()
     : rows
 
-  // Deduplicate by URL — drop later occurrences entirely so they never appear in results
-  const urlsSeen = new Set<string>()
-  const prospectInserts = allowedRows
-    .filter((row) => {
-      const key = row.url.toLowerCase().replace(/\/$/, '')
-      if (urlsSeen.has(key)) return false
-      urlsSeen.add(key)
-      return true
-    })
+  // Deduplicate by URL — keep the highest-priority contact per company
+  const prospectInserts = pickBestContacts(allowedRows)
     .map((row) => ({
       list_id: '', // filled after list is created
       user_id: user.id,
