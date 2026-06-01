@@ -131,16 +131,6 @@ export default function HowItWorks() {
             ))}
           </ol>
 
-          <div className="border-t border-gray-100 pt-4 space-y-2">
-            <p className="text-xs font-medium text-[#2E3A59]">How lists work</p>
-            <p className="text-xs text-gray-500 leading-relaxed">
-              Every list in LeadPulse is completely isolated. A run of 30 prospects and a run of 5 prospects are two separate lists — they don&rsquo;t know about each other. Your results, CSV export, and HubSpot sync all operate only on the list you&rsquo;re currently viewing. If you export the 5-company list, you get 5 rows. The 30 from the other run are never included.
-            </p>
-            <p className="text-xs text-gray-500 leading-relaxed">
-              This means you can run multiple campaigns simultaneously — different industries, different regions, different criteria — and each one stays clean and separate.
-            </p>
-          </div>
-
           <p className="text-xs text-gray-400 border-t border-gray-100 pt-3 leading-relaxed">
             LeadPulse does not replace Apollo or HubSpot — it works alongside them. Apollo finds your prospects. HubSpot stores them. LeadPulse tells you which ones are worth calling and exactly what to say.
           </p>
