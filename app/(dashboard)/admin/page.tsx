@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import HubSpotReference from './HubSpotReference'
+import DevNotes from './DevNotes'
 
 export default async function AdminPage() {
   const supabase = await createClient()
@@ -176,6 +177,7 @@ export default async function AdminPage() {
       </div>
 
       <HubSpotReference />
+      <DevNotes />
     </div>
   )
 }
