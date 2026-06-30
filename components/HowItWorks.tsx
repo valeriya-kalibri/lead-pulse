@@ -67,6 +67,12 @@ const STEPS = [
   },
 ]
 
+const SCORE_COLORS: Record<string, string> = {
+  '🔥 Hot':  'bg-orange-50 border-orange-200 text-orange-800',
+  '⚡ Warm': 'bg-yellow-50 border-yellow-200 text-yellow-800',
+  '❄️ Cold': 'bg-sky-50 border-sky-200 text-sky-800',
+}
+
 export default function HowItWorks() {
   const [open, setOpen] = useState(false)
 
@@ -75,11 +81,11 @@ export default function HowItWorks() {
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-gray-50/60 transition-colors"
+        className="w-full flex items-center justify-between px-5 py-4 text-left hover:bg-gray-50/60 transition-colors"
       >
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-[#2E3A59]">How LeadPulse Works</span>
-          <span className="rounded-full bg-[#AABFFF]/20 px-2 py-0.5 text-xs text-[#2E3A59]">
+        <div className="flex items-center gap-2.5">
+          <span className="text-sm font-semibold text-[#2E3A59]">How LeadPulse Works</span>
+          <span className="rounded-full bg-brand-light/20 px-2.5 py-0.5 text-xs font-medium text-brand">
             6 steps
           </span>
         </div>
@@ -95,43 +101,61 @@ export default function HowItWorks() {
       </button>
 
       {open && (
-        <div className="border-t border-gray-100 px-4 pt-4 pb-5 space-y-5">
+        <div className="border-t border-gray-100 px-5 pt-5 pb-6 space-y-6">
 
-          <p className="text-xs text-gray-500 leading-relaxed">
+          <p className="text-sm text-gray-500 leading-relaxed">
             LeadPulse visits every website on your list and automatically researches each one — so you know exactly who to call, what to say, and who to skip before you make a single outreach attempt.
           </p>
 
-          <ol className="space-y-5">
+          <ol className="space-y-3">
             {STEPS.map((s) => (
-              <li key={s.n} className="flex gap-3">
-                <span className="mt-0.5 flex-shrink-0 text-xs font-semibold tabular-nums text-[#AABFFF]">
-                  {s.n}
-                </span>
-                <div className="space-y-1.5 min-w-0">
-                  <p className="text-xs font-medium text-[#2E3A59]">{s.title}</p>
-                  <p className="text-xs text-gray-500 leading-relaxed">{s.body}</p>
-                  {s.sub && (
-                    <ul className="space-y-1.5 pt-0.5">
-                      {s.sub.map((item) => (
-                        <li key={item.label} className="flex gap-2 text-xs text-gray-500 leading-relaxed">
-                          <span className="font-medium text-[#2E3A59] flex-shrink-0 whitespace-nowrap">{item.label} —</span>
-                          <span>{item.desc}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                  {'footer' in s && s.footer && (
-                    <p className="text-xs text-gray-500 leading-relaxed pt-0.5">{s.footer}</p>
-                  )}
-                  {s.note && (
-                    <p className="text-xs text-gray-400 leading-relaxed italic pt-0.5">{s.note}</p>
-                  )}
+              <li key={s.n} className="rounded-lg border border-gray-100 bg-gray-50/50 p-4">
+                <div className="flex gap-3.5">
+                  <span className="shrink-0 flex items-center justify-center w-7 h-7 rounded-full bg-brand-light/25 text-brand text-xs font-bold">
+                    {parseInt(s.n)}
+                  </span>
+                  <div className="space-y-2 min-w-0 pt-0.5">
+                    <p className="text-sm font-semibold text-brand">{s.title}</p>
+                    <p className="text-sm text-gray-600 leading-relaxed">{s.body}</p>
+
+                    {s.sub && (
+                      <ul className="space-y-2.5 pt-1">
+                        {s.sub.map((item) => {
+                          const scoreStyle = SCORE_COLORS[item.label]
+                          return scoreStyle ? (
+                            <li
+                              key={item.label}
+                              className={`flex items-start gap-2.5 rounded-md border px-3 py-2 ${scoreStyle}`}
+                            >
+                              <span className="text-sm font-semibold shrink-0 whitespace-nowrap">{item.label}</span>
+                              <span className="text-sm leading-relaxed">{item.desc}</span>
+                            </li>
+                          ) : (
+                            <li key={item.label} className="border-l-2 border-brand-light/50 pl-3 space-y-0.5">
+                              <p className="text-xs font-semibold text-brand">{item.label}</p>
+                              <p className="text-sm text-gray-600 leading-relaxed">{item.desc}</p>
+                            </li>
+                          )
+                        })}
+                      </ul>
+                    )}
+
+                    {'footer' in s && s.footer && (
+                      <p className="text-sm text-gray-500 leading-relaxed pt-1 border-t border-gray-200 mt-2">{s.footer}</p>
+                    )}
+
+                    {s.note && (
+                      <div className="rounded-md bg-amber-50 border border-amber-100 px-3 py-2.5 mt-1">
+                        <p className="text-xs text-amber-800 leading-relaxed">{s.note}</p>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </li>
             ))}
           </ol>
 
-          <p className="text-xs text-gray-400 border-t border-gray-100 pt-3 leading-relaxed">
+          <p className="text-sm text-gray-400 border-t border-gray-100 pt-4 leading-relaxed">
             LeadPulse does not replace Apollo or HubSpot — it works alongside them. Apollo finds your prospects. HubSpot stores them. LeadPulse tells you which ones are worth calling and exactly what to say.
           </p>
 
